@@ -23,7 +23,11 @@ defmodule PhoenixExRatatui.MixProject do
       docs: docs(),
       test_coverage: [
         summary: [threshold: 100],
-        ignore_modules: []
+        ignore_modules: [
+          # Test fixtures — exercised by tests, not production surface.
+          PhoenixExRatatui.TestApp,
+          PhoenixExRatatui.FailingMountApp
+        ]
       ],
       dialyzer: [
         plt_local_path: "plts",
