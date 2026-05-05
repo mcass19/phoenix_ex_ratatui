@@ -86,8 +86,16 @@ defmodule PhoenixExRatatui.Transport do
     * `:mod` (required) — module implementing `ExRatatui.App`.
     * `:width` (required) — initial terminal width in cells. Must be `>= 1`.
     * `:height` (required) — initial terminal height in cells. Must be `>= 1`.
-    * `:target` (required) — `t:pid/0` that should receive rendered
-      `%Diff{}` messages. Typically `self()` from a LiveView mount.
+    * `:target` (required) — `t:pid/0` the runtime server should be
+      linked to (typically `self()` from a LiveView mount). Used by
+      the default writer if `:writer` is not given.
+    * `:writer` (optional) — a 1-arity function called with each
+      rendered `%CellSession.Diff{}`. Defaults to a function that
+      sends `{:phoenix_ex_ratatui, :render, diff}` to `:target`.
+      `PhoenixExRatatui.LiveComponent` overrides this to call
+      `Phoenix.LiveView.send_update/3` instead, since LiveComponents
+      have no `handle_info/2` and must receive updates via
+      `update/2`.
     * Any other option — passed through verbatim to `mod.mount/1`. Use
       this to thread per-connection context (current user, params,
       LiveView socket id) into the App without a global registry.
@@ -116,10 +124,11 @@ defmodule PhoenixExRatatui.Transport do
               inspect(target: target, width: width, height: height)
     end
 
-    pass_through_opts = Keyword.drop(opts, [:target, :width, :height, :mod, :transport, :name])
+    pass_through_opts =
+      Keyword.drop(opts, [:target, :width, :height, :mod, :transport, :name, :writer])
 
     cell_session = CellSession.new(width, height)
-    writer_fn = build_writer(target)
+    writer_fn = Keyword.get(opts, :writer) || build_writer(target)
 
     server_opts =
       [
