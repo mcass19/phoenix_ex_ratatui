@@ -1,0 +1,14 @@
+{
+  "name": "phoenix_ex_ratatui_assets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JS bundle for the phoenix_ex_ratatui LiveView hook (DOM cell-grid painter, no terminal emulator).",
+  "scripts": {
+    "build": "node build.js",
+    "build:dev": "node build.js --dev"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}
