@@ -66,6 +66,7 @@ defmodule PhoenixExRatatui.MixProject do
 
       # Test
       {:floki, "~> 0.36", only: :test},
+      {:stream_data, "~> 1.1", only: :test},
 
       # Dev
       {:ex_doc, "~> 0.35", only: :dev, runtime: false},
