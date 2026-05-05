@@ -60,14 +60,20 @@ defmodule PhoenixExRatatui.Transport do
 
   alias ExRatatui.CellSession
   alias ExRatatui.CellSession.Diff
+  alias PhoenixExRatatui.Telemetry
 
   @typedoc """
-  References returned from `start_link/1`. Hold onto both — the
-  `:server` pid for `push_event/2` and `stop/2`, the `:cell_session`
-  for `resize/3` (which must resize the session before notifying the
-  server).
+  References returned from `start_link/1`. Hold onto all three —
+  the `:server` pid for `push_event/2` and `stop/2`, the
+  `:cell_session` for `resize/3` (which must resize the session
+  before notifying the server), and `:mod` for telemetry / debug
+  contexts where the App module that's being driven matters.
   """
-  @type refs :: %{server: pid(), cell_session: CellSession.t()}
+  @type refs :: %{
+          server: pid(),
+          cell_session: CellSession.t(),
+          mod: module()
+        }
 
   @doc """
   Constructs an `ExRatatui.CellSession` at `width x height` and starts
@@ -122,19 +128,25 @@ defmodule PhoenixExRatatui.Transport do
         transport: {:cell_session, cell_session, writer_fn}
       ] ++ pass_through_opts
 
-    case ExRatatui.Transport.start_server(server_opts) do
-      {:ok, server} ->
-        {:ok, %{server: server, cell_session: cell_session}}
+    Telemetry.span(
+      [:transport, :connect],
+      %{mod: mod, width: width, height: height, target: target},
+      fn ->
+        case ExRatatui.Transport.start_server(server_opts) do
+          {:ok, server} ->
+            {:ok, %{server: server, cell_session: cell_session, mod: mod}}
 
-      {:error, _reason} = err ->
-        # Belt-and-braces: the Server's `continue_init_cell_session`
-        # already closes the session on mount failure, but if the
-        # error came from before that point (or returned from a
-        # future code path that doesn't), we don't want to leak the
-        # NIF resource.
-        CellSession.close(cell_session)
-        err
-    end
+          {:error, _reason} = err ->
+            # Belt-and-braces: the Server's `continue_init_cell_session`
+            # already closes the session on mount failure, but if the
+            # error came from before that point (or returned from a
+            # future code path that doesn't), we don't want to leak the
+            # NIF resource.
+            CellSession.close(cell_session)
+            err
+        end
+      end
+    )
   end
 
   @doc """
@@ -193,8 +205,9 @@ defmodule PhoenixExRatatui.Transport do
   via the standard EXIT path.
   """
   @spec stop(refs(), term()) :: :ok
-  def stop(%{server: server}, reason \\ :normal) do
+  def stop(%{server: server, mod: mod} = _refs, reason \\ :normal) do
     if Process.alive?(server) do
+      Telemetry.execute([:transport, :disconnect], %{}, %{mod: mod, reason: reason})
       GenServer.stop(server, reason)
     else
       :ok

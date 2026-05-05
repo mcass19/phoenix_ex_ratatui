@@ -83,6 +83,7 @@ defmodule PhoenixExRatatui.LiveView do
 
   alias ExRatatui.Event.Key
   alias PhoenixExRatatui.Renderer.Html
+  alias PhoenixExRatatui.Telemetry
   alias PhoenixExRatatui.Transport
 
   @doc """
@@ -202,7 +203,8 @@ defmodule PhoenixExRatatui.LiveView do
 
       @impl Phoenix.LiveView
       def handle_info({:phoenix_ex_ratatui, :render, diff}, socket) do
-        {:noreply, PhoenixExRatatui.LiveView.__push_render__(socket, diff)}
+        {:noreply,
+         PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_app, diff)}
       end
 
       defoverridable mount: 3, render: 1, handle_event: 3, handle_info: 2
@@ -247,13 +249,23 @@ defmodule PhoenixExRatatui.LiveView do
   # diff lives here (rather than inline in the macro-generated
   # handle_info) so the quote block doesn't carry a fully-qualified
   # reference to PhoenixExRatatui.Renderer.Html — keeps the macro
-  # output small and the module aliases tidy.
-  def __push_render__(socket, diff) do
-    Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
+  # output small and the module aliases tidy. Wraps the encode +
+  # push_event work in a `[:phoenix_ex_ratatui, :render, :frame]`
+  # span so per-frame Phoenix-side cost is observable in metrics.
+  def __push_render__(socket, mod, diff) do
+    meta = %{mod: mod, width: diff.width, height: diff.height, ops_count: length(diff.ops)}
+
+    Telemetry.span([:render, :frame], meta, fn ->
+      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
+    end)
   end
 
   @doc false
-  # Internal helper for the input event handler.
+  # Internal helper for the input event handler. Emits a
+  # `[:phoenix_ex_ratatui, :input, :forward]` event so consumers can
+  # count input rates / latencies; the actual push_event/2 to the
+  # runtime is forwarded after the telemetry call so a slow handler
+  # never blocks input dispatch.
   def __handle_input__(socket, payload) do
     case socket.assigns.tui do
       nil ->
@@ -265,6 +277,7 @@ defmodule PhoenixExRatatui.LiveView do
 
       refs ->
         event = decode_input(payload)
+        Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
         :ok = Transport.push_event(refs, event)
         socket
     end
