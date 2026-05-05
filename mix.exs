@@ -26,7 +26,11 @@ defmodule PhoenixExRatatui.MixProject do
         ignore_modules: [
           # Test fixtures — exercised by tests, not production surface.
           PhoenixExRatatui.TestApp,
-          PhoenixExRatatui.FailingMountApp
+          PhoenixExRatatui.FailingMountApp,
+          PhoenixExRatatui.TestLive,
+          PhoenixExRatatui.FailingTestLive,
+          PhoenixExRatatui.TestEndpoint,
+          PhoenixExRatatui.TestErrorHTML
         ]
       ],
       dialyzer: [
@@ -65,7 +69,7 @@ defmodule PhoenixExRatatui.MixProject do
       {:jason, "~> 1.4"},
 
       # Test
-      {:floki, "~> 0.36", only: :test},
+      {:lazy_html, "~> 0.1", only: :test},
       {:stream_data, "~> 1.1", only: :test},
 
       # Dev
