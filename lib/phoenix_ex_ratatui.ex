@@ -22,6 +22,30 @@ defmodule PhoenixExRatatui do
   `ExRatatui.Transport`) and a single `PhoenixExRatatui.Renderer.Html`
   for cell-diff JSON encoding.
 
+  ## Wiring the JS hook
+
+  The bundled JS hook lives in this package at
+  `lib/assets/phoenix_ex_ratatui/main.js`. Wire it into your app's
+  LiveSocket so the `phx-hook="PhoenixExRatatuiHook"` attribute the
+  LiveView renders has somewhere to dispatch:
+
+  ```js
+  // assets/js/app.js
+  import { Socket } from "phoenix"
+  import { LiveSocket } from "phoenix_live_view"
+  import { PhoenixExRatatuiHook } from "../../deps/phoenix_ex_ratatui/lib/assets/phoenix_ex_ratatui/main.js"
+
+  const liveSocket = new LiveSocket("/live", Socket, {
+    hooks: { PhoenixExRatatuiHook }
+  })
+  ```
+
+  The hook handles cell-grid measurement, paint, key forwarding, and
+  resize reporting. No additional CSS is required (the hook sets a
+  monospace font, `white-space: pre`, and `line-height: 1` on its
+  container as defaults; users override any of those via their own
+  CSS).
+
   ## Status
 
   Pre-release. Public API is being built up chunk by chunk; until
