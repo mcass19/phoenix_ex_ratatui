@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
     <title>{assigns[:page_title] || "phoenix_ex_ratatui demo"}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script defer phx-track-static type="text/javascript" src="/assets/app.js"></script>
     <style>
-      body { margin: 0; background: #1a1a1a; color: #eaeaea; }
-      a { color: #729fcf; }
-      kbd { background: #333; padding: 0 0.3em; border-radius: 3px; }
-      code { background: #333; padding: 0 0.3em; border-radius: 3px; }
+      body { margin: 0; background: #0f0c14; color: #e9e4f5; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      a { color: #ad7fa8; }
+      kbd { background: #1a1424; padding: 0 0.3em; border-radius: 3px; border: 1px solid #75507b; color: #ad7fa8; }
+      code { background: #1a1424; padding: 0 0.3em; border-radius: 3px; color: #ad7fa8; }
     </style>
   </head>
   <body>

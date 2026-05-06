@@ -14,14 +14,12 @@ defmodule DemoWeb.HomeLive do
 
   @banner_lines [
     "",
-    "✱  phoenix_ex_ratatui  ✱",
+    "~$  whoami",
     "",
-    "Run ExRatatui apps inside a Phoenix LiveView",
-    "— cell-grid TUIs over the LiveView socket —",
+    "run ex_ratatui apps inside Phoenix LiveView",
     "",
     "",
-    "[ c ]  open chat — full-page TUI, callbacks runtime",
-    "[ a ]  open admin — system monitor in a LiveComponent (reducer runtime)",
+    "[ c ] chat    [ a ] admin",
     ""
   ]
 
@@ -36,14 +34,14 @@ defmodule DemoWeb.HomeLive do
       block: %Block{
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: %Style{fg: :magenta}
       }
     }
 
     banner_height = length(@banner_lines) + 2
     banner_width = min(content_area.width - 4, 70)
     banner_area = UI.center_box(content_area, banner_width, banner_height)
-    banner = UI.banner("welcome", @banner_lines)
+    banner = UI.banner("~/phoenix_ex_ratatui", @banner_lines)
 
     footer = UI.nav_hints([{"c", "chat"}, {"a", "admin"}, {"q", "exit"}])
 

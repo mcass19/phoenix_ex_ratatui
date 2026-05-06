@@ -9,7 +9,7 @@ defmodule DemoWeb.AdminLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Admin Dashboard")}
+    {:ok, socket}
   end
 
   # Forwarding clause documented in `PhoenixExRatatui.LiveComponent`'s
@@ -29,9 +29,10 @@ defmodule DemoWeb.AdminLive do
       <p>
         The panel below is a <strong>reducer-runtime</strong>
         <code>PhoenixExRatatui.LiveComponent</code> embedded inside
-        this regular Phoenix LiveView page. Click the TUI to focus it
-        and press <kbd>r</kbd> to refresh, or <kbd>b</kbd> to navigate
-        back to <a href="/">home</a> via a runtime intent.
+        this regular Phoenix LiveView page. Click the TUI to focus it,
+        then press <kbd>r</kbd> to refresh, <kbd>c</kbd> to jump to
+        the <a href="/chat">chat</a>, or <kbd>b</kbd> to head back to
+        <a href="/">home</a> — every navigation is a runtime intent.
       </p>
 
       <p style="color: #555;">
@@ -41,7 +42,7 @@ defmodule DemoWeb.AdminLive do
         no manual reschedule.
       </p>
 
-      <section style="margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;">
+      <section style="margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px;">
         <h2 style="margin-top: 0;">System Monitor (TUI)</h2>
         <!-- The LiveComponent fills its parent (width: 100%; height: 100%).
              We give the wrapping div an explicit height so there's room

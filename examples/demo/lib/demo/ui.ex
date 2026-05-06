@@ -11,6 +11,7 @@ defmodule Demo.UI do
   alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
+  alias ExRatatui.Text.Span
   alias ExRatatui.Widgets.{Block, Paragraph}
 
   @doc """
@@ -61,13 +62,16 @@ defmodule Demo.UI do
   inside the rect via `center_box/3`).
   """
   @spec banner(String.t(), [String.t()], Style.t()) :: Paragraph.t()
-  def banner(title, content_lines, accent_style \\ %Style{fg: :light_cyan, modifiers: [:bold]}) do
+  def banner(title, content_lines, accent_style \\ %Style{fg: :green, modifiers: [:bold]}) do
     %Paragraph{
       text: Enum.join(content_lines, "\n"),
       alignment: :center,
       style: accent_style,
       block: %Block{
-        title: " " <> title <> " ",
+        title: %Span{
+          content: " " <> title <> " ",
+          style: %Style{fg: :light_magenta, modifiers: [:bold]}
+        },
         borders: [:all],
         border_type: :rounded,
         border_style: %Style{fg: :magenta}

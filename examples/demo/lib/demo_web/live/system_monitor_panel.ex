@@ -34,6 +34,9 @@ defmodule DemoWeb.SystemMonitorPanel do
   def tui_update({:event, %Key{code: "b"}}, state),
     do: {:noreply, state, intents: [{:navigate, "/"}]}
 
+  def tui_update({:event, %Key{code: "c"}}, state),
+    do: {:noreply, state, intents: [{:navigate, "/chat"}]}
+
   def tui_update({:event, _event}, state), do: {:noreply, state}
 
   def tui_update({:info, :refresh}, state), do: {:noreply, collect_stats(state)}
@@ -61,7 +64,7 @@ defmodule DemoWeb.SystemMonitorPanel do
       {disk_widget(state), disk_area},
       {network_widget(state), net_area},
       {beam_widget(state), beam_area},
-      {Demo.UI.nav_hints([{"r", "refresh now"}, {"b", "back to home"}]), footer_area}
+      {Demo.UI.nav_hints([{"r", "refresh"}, {"c", "chat"}, {"b", "home"}]), footer_area}
     ]
   end
 
@@ -70,12 +73,12 @@ defmodule DemoWeb.SystemMonitorPanel do
   defp header_widget(state) do
     %Paragraph{
       text: "  #{state.hostname}    Uptime: #{format_uptime(state.uptime_seconds)}",
-      style: %Style{fg: :cyan, modifiers: [:bold]},
+      style: %Style{fg: :light_magenta, modifiers: [:bold]},
       block: %Block{
         title: " System Monitor ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :cyan}
+        border_style: %Style{fg: :magenta}
       }
     }
   end
