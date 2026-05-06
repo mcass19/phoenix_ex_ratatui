@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide walks through wiring an `ExRatatui.App` into a Phoenix
-LiveView from scratch, then explains the three integration APIs and
-when to reach for each.
+This guide walks through wiring a TUI into a Phoenix LiveView from
+scratch, then explains the two integration APIs and when to reach
+for each.
 
 ## Project setup
 
@@ -57,24 +57,53 @@ TUI's container by `phx-hook="PhoenixExRatatuiHook"` and handles cell
 measurement, paint, keypress forwarding, and resize observation
 itself.
 
-## Step 1 — Write an `ExRatatui.App`
+## The unified-module pattern
 
-The `ExRatatui.App` you drive doesn't know it's running in a browser.
-Same module that runs in a real terminal works unchanged here — the
-package's transport just routes cells to the DOM instead of ANSI to
-the tty.
+Both APIs (`PhoenixExRatatui.LiveView` and
+`PhoenixExRatatui.LiveComponent`) are **unified modules**: the same
+module is both the Phoenix LiveView/LiveComponent AND the
+`ExRatatui.App` driving it.
+
+The macro doesn't fight Phoenix's `handle_info/2` callback (which
+takes a socket) and the App's `handle_info/2` callback (which takes
+App state) — they have the same name and arity but different
+semantics. Instead, the macro auto-generates a hidden
+`Module.Runtime` proxy via `@after_compile` that conforms to
+`ExRatatui.App` by delegating to a small set of `tui_*` callbacks on
+your module:
+
+| Callback | Purpose | Default |
+|---|---|---|
+| `tui_mount(opts)` | Initialise App state | `{:ok, %{}}` |
+| `tui_render(state, frame)` | Produce widgets | `[]` |
+| `tui_handle_event(event, state)` | Handle a key/mouse/resize event | `{:noreply, state}` |
+| `tui_handle_info(msg, state)` | Handle a non-terminal message (PubSub, send) | `{:noreply, state}` |
+| `tui_terminate(reason, state)` | Cleanup on shutdown | `:ok` |
+| `tui_mount_opts(socket)` | Bridge socket assigns into `tui_mount/1` | `[]` |
+
+All are overridable; you implement what you need. Phoenix's regular
+LV/LC callbacks (`mount/3`, `render/1`, `handle_event/3`, etc.)
+remain available and overridable through the same `defoverridable`
+mechanism.
+
+## Two ways to mount a TUI
+
+### Option A — Full-page TUI route (`PhoenixExRatatui.LiveView`)
+
+When the page IS a TUI, write a unified module and mount it through
+the router's regular `live/3` macro:
 
 ```elixir
-defmodule MyApp.Counter do
-  use ExRatatui.App
+defmodule MyAppWeb.CounterLive do
+  use PhoenixExRatatui.LiveView
 
   alias ExRatatui.Event.Key
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Widgets.{Block, Paragraph}
 
-  def mount(_opts), do: {:ok, %{n: 0}}
+  def tui_mount(_opts), do: {:ok, %{n: 0}}
 
-  def render(state, frame) do
+  def tui_render(state, frame) do
     [
       {%Paragraph{
          text: "Count: #{state.n}\n\n+ increment   - decrement   q quit",
@@ -84,73 +113,74 @@ defmodule MyApp.Counter do
     ]
   end
 
-  def handle_event(%Key{code: "+"}, s), do: {:noreply, %{s | n: s.n + 1}}
-  def handle_event(%Key{code: "-"}, s), do: {:noreply, %{s | n: s.n - 1}}
-  def handle_event(%Key{code: "q"}, s), do: {:stop, s}
-  def handle_event(_, s), do: {:noreply, s}
+  def tui_handle_event(%Key{code: "+"}, s), do: {:noreply, %{s | n: s.n + 1}}
+  def tui_handle_event(%Key{code: "-"}, s), do: {:noreply, %{s | n: s.n - 1}}
+  def tui_handle_event(%Key{code: "q"}, s), do: {:stop, s}
+  def tui_handle_event(_, s), do: {:noreply, s}
 end
 ```
 
-## Step 2 — Pick an integration API
-
-### Option A — `tui_live` router macro (zero boilerplate)
+In the router:
 
 ```elixir
-# lib/my_app_web/router.ex
-defmodule MyAppWeb.Router do
-  use Phoenix.Router
-  import PhoenixExRatatui.Router
-
-  pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-  end
-
-  scope "/", MyAppWeb do
-    pipe_through :browser
-
-    tui_live "/counter", MyApp.Counter
-  end
+scope "/", MyAppWeb do
+  pipe_through :browser
+  live "/counter", CounterLive
 end
 ```
 
-That's the entire integration. Visit `/counter` and the Counter App
-runs in the browser. The macro generates a wrapping LiveView at
-compile time and registers it as a normal `live` route — invisible
-to your app code, no module to write.
+That's the full integration. The `@after_compile` hook generates
+`MyAppWeb.CounterLive.Runtime` automatically — you never reference
+it directly.
 
-### Option B — `use PhoenixExRatatui.LiveView` (explicit form)
+#### Threading socket data into the App
 
-When you need to override `mount/3` to thread `current_user` from
-the session, add custom assigns, or otherwise customise the LV
-beyond what the router-level shortcut supports, write the wrapper
-yourself:
+When you need to pass per-connection context (current user, session,
+URL params) from the LiveView mount into `tui_mount/1`, override
+`tui_mount_opts/1`:
 
 ```elixir
-defmodule MyAppWeb.CounterLive do
-  use PhoenixExRatatui.LiveView, app: MyApp.Counter
+defmodule MyAppWeb.AdminTui do
+  use PhoenixExRatatui.LiveView
 
-  # Override mount to layer your own logic on top.
-  @impl true
-  def mount(params, session, socket) do
-    {:ok, socket} = super(params, session, socket)
-    {:ok, assign(socket, :current_user, session["user_id"])}
+  @impl Phoenix.LiveView
+  def mount(_params, session, socket) do
+    {:ok, socket} = super(nil, nil, socket)
+    {:ok, assign(socket, :user_id, session["user_id"])}
   end
-end
 
-# router:
-live "/counter", MyAppWeb.CounterLive
+  def tui_mount_opts(socket), do: [user_id: socket.assigns.user_id]
+
+  def tui_mount(opts), do: {:ok, %{user_id: opts[:user_id]}}
+end
 ```
 
-The macro generates the same callbacks the router-level shortcut
-produces, but they're all `defoverridable`, so you can wrap any of
-them with your own behaviour and call `super(...)`.
+`super/3` delegates to the macro's default `mount/3` (which sets up
+internal assigns and trap_exit); you layer your own assigns on top
+afterward. `tui_mount_opts/1` reads them off the socket and returns
+the keyword list that becomes `opts` in `tui_mount/1`.
 
-### Option C — `LiveComponent` (embed in an existing LiveView)
+### Option B — Embedded TUI (`PhoenixExRatatui.LiveComponent`)
 
 When the page is a regular Phoenix dashboard with a TUI sidebar, dev
 console, or modal — anything where the TUI lives alongside other
-content the user already controls — drop in the LiveComponent:
+content the user already controls — write a unified `LiveComponent`:
+
+```elixir
+defmodule MyAppWeb.SystemMonitorPanel do
+  use PhoenixExRatatui.LiveComponent
+
+  def tui_mount(_opts), do: {:ok, %{cpu: 0.0, mem: 0.0}}
+
+  def tui_render(state, frame) do
+    # widgets…
+  end
+
+  def tui_handle_event(_event, state), do: {:noreply, state}
+end
+```
+
+Embed it inside any LiveView's render:
 
 ```elixir
 defmodule MyAppWeb.AdminLive do
@@ -174,40 +204,32 @@ defmodule MyAppWeb.AdminLive do
 
       <div>
         <h2>Live System Monitor</h2>
-        <.live_component
-          module={PhoenixExRatatui.LiveComponent}
-          id="admin-tui"
-          app={MyApp.SystemMonitorTui}
-        />
+        <.live_component module={MyAppWeb.SystemMonitorPanel} id="admin-tui" />
       </div>
     </div>
     """
   end
 end
-
-# router:
-live "/admin", MyAppWeb.AdminLive
 ```
 
 The TUI's diff stream routes through `Phoenix.LiveView.send_update/3`
 into the component's `update/2` (LiveComponents have no `handle_info`
 — they share the parent LV's process). Everything else is identical
-to the full-page paths.
+to the full-page path.
 
 ## Decision matrix
 
 | Use | When |
 |---|---|
-| `tui_live "/path", MyApp` | The whole page IS the TUI and you want zero boilerplate |
-| `use PhoenixExRatatui.LiveView, app: MyApp` | The whole page IS the TUI but you need custom mount logic, per-route assigns, or `defoverridable` callbacks |
-| `<.live_component module={PhoenixExRatatui.LiveComponent} ...>` | The page contains the TUI alongside other content (admin panels, dashboards, modals, dev tooling) |
+| `use PhoenixExRatatui.LiveView` | The whole page IS the TUI |
+| `use PhoenixExRatatui.LiveComponent` | The page contains the TUI alongside other content (admin panels, dashboards, modals, dev tooling) |
 
-All three are fully production-ready. The decision is purely about
-fit with your project layout.
+Both are fully production-ready. The decision is purely about fit
+with your project layout.
 
 ## Telemetry
 
-Every integration emits the same `:telemetry` events. Attach the
+Both integrations emit the same `:telemetry` events. Attach the
 default logger in dev:
 
 ```elixir
@@ -259,10 +281,9 @@ the App over SSH) is the right call.
 
 - Browse the full module reference for [`PhoenixExRatatui.LiveView`](`PhoenixExRatatui.LiveView`),
   [`PhoenixExRatatui.LiveComponent`](`PhoenixExRatatui.LiveComponent`),
-  [`PhoenixExRatatui.Router`](`PhoenixExRatatui.Router`), and
-  [`PhoenixExRatatui.Transport`](`PhoenixExRatatui.Transport`)
+  and [`PhoenixExRatatui.Transport`](`PhoenixExRatatui.Transport`)
 - Read the [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo)
   README and source for a working minimal Phoenix app that uses
-  both `tui_live` and `LiveComponent` against the same TUI
+  both unified APIs side-by-side
 - For the upstream cell-extraction primitive, see
   [`ExRatatui.CellSession`](https://hexdocs.pm/ex_ratatui/ExRatatui.CellSession.html)

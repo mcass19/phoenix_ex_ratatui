@@ -1,84 +1,130 @@
 defmodule PhoenixExRatatui.LiveView do
   @moduledoc """
-  Macro that generates a full-page `Phoenix.LiveView` wrapping an
-  `ExRatatui.App`.
+  Macro that turns the calling module into a full-page TUI route — the
+  same module is both a `Phoenix.LiveView` and the `ExRatatui.App` that
+  drives it.
 
   ## Quick start
 
-      # In your router:
+      # In your router (no special macro needed):
       live "/tui", MyAppWeb.MyTuiLive
 
-      # Anywhere else (typically lib/my_app_web/live/):
+      # The live module:
       defmodule MyAppWeb.MyTuiLive do
-        use PhoenixExRatatui.LiveView, app: MyApp.Tui
+        use PhoenixExRatatui.LiveView
+        alias ExRatatui.Layout.Rect
+        alias ExRatatui.Widgets.Paragraph
+
+        def tui_mount(_opts), do: {:ok, %{count: 0}}
+
+        def tui_render(state, frame) do
+          [{%Paragraph{text: "Count: \#{state.count}"},
+            %Rect{x: 0, y: 0, width: frame.width, height: frame.height}}]
+        end
+
+        def tui_handle_event(%ExRatatui.Event.Key{code: "+"}, state),
+          do: {:noreply, %{state | count: state.count + 1}}
+
+        def tui_handle_event(%ExRatatui.Event.Key{code: "q"}, state),
+          do: {:stop, state}
+
+        def tui_handle_event(_event, state), do: {:noreply, state}
       end
 
-  That's it. Visit `/tui` and the App runs in the browser. The
-  generated LiveView mounts a `<div phx-hook="PhoenixExRatatuiHook">`,
-  the JS hook (in this package's bundled assets) measures its cell
-  grid, reports dimensions back to the server, and the
-  `PhoenixExRatatui.Transport` starts an `ExRatatui.Server` driving
-  `MyApp.Tui` against an `ExRatatui.CellSession` at the reported size.
-  Frame diffs ship to the hook as `push_event/3` payloads encoded by
-  `PhoenixExRatatui.Renderer.Html`; client input flows back as
-  `phx_ex_ratatui:input` events.
+  ## How it works
+
+  `use PhoenixExRatatui.LiveView` injects a full `Phoenix.LiveView`
+  implementation (mount/3, render/1, handle_event/3, handle_info/2)
+  AND, via `@after_compile`, generates a sibling
+  `MyAppWeb.MyTuiLive.Runtime` module that implements `ExRatatui.App`
+  by delegating to the `tui_*` callbacks on your module.
+
+  The runtime proxy exists because `Phoenix.LiveView.handle_info/2`
+  (msg, socket) and `ExRatatui.App.handle_info/2` (msg, state) collide
+  on arity. Splitting the App into a hidden submodule lets both
+  behaviours live side-by-side without renaming Phoenix LV callbacks.
+
+  You don't have to think about the proxy — write `tui_*` callbacks,
+  the macro handles the rest.
+
+  ## TUI callbacks (override what you need)
+
+    * `tui_mount(opts)` — return `{:ok, state}`, `{:ok, state,
+      runtime_opts}`, or `{:error, reason}`. `opts` is the keyword
+      list returned by `tui_mount_opts/1`.
+    * `tui_render(state, frame)` — return a list of `{widget, rect}`
+      tuples. Default: `[]`.
+    * `tui_handle_event(event, state)` — return `{:noreply, state}` or
+      `{:stop, state}`. Default: `{:noreply, state}`.
+    * `tui_handle_info(msg, state)` — same shape; for messages sent to
+      the runtime server (PubSub, `send/2`). Default: `{:noreply, state}`.
+    * `tui_terminate(reason, state)` — cleanup. Default: `:ok`.
+    * `tui_mount_opts(socket)` — return the keyword list passed as
+      `opts` to `tui_mount/1`. Use this to thread per-connection
+      context (current user, params) from `Phoenix.LiveView` assigns
+      into the App. Default: `[]`.
+
+  ## Threading socket data into the App
+
+  `tui_mount_opts/1` is the bridge:
+
+      defmodule MyAppWeb.AdminTui do
+        use PhoenixExRatatui.LiveView
+
+        @impl Phoenix.LiveView
+        def mount(_params, session, socket) do
+          {:ok, socket} = super(nil, nil, socket)
+          {:ok, Phoenix.Component.assign(socket, :user_id, session["user_id"])}
+        end
+
+        def tui_mount_opts(socket), do: [user_id: socket.assigns.user_id]
+
+        def tui_mount(opts), do: {:ok, %{user_id: opts[:user_id], n: 0}}
+      end
 
   ## Lifecycle
 
-  - **HTTP mount** (not `connected?`) — empty assigns, render the hook
+  - **HTTP mount** (not `connected?`) — empty assigns, render hook
     container, no Transport. Per `phoenix-thinking`'s no-work-in-mount
-    rule: HTTP mount runs twice (once for the static render, once for
-    the WebSocket handshake), so we never start the server here.
-  - **WebSocket mount** — `Process.flag(:trap_exit, true)` is set so a
-    mount-failing TUI app returns `{:error, _}` cleanly from
+    rule: `mount/3` runs twice (HTTP request + WebSocket handshake).
+  - **WebSocket mount** — `Process.flag(:trap_exit, true)` so a
+    mount-failing TUI returns `{:error, _}` cleanly from
     `Transport.start_link/1` instead of killing the LV (which would
-    trigger an infinite client reconnect loop). Initial assigns set
-    `:tui` to `nil`; the Transport starts on the first `"resize"`
-    event from the hook.
-  - **Hook reports size** (`phx_ex_ratatui:resize`) — first time:
-    start the Transport at `{cols, rows}`. Subsequent times: call
-    `Transport.resize/3`, which both resizes the underlying
-    `CellSession` and notifies the runtime so the App's
-    `handle_event/2` sees a `%ExRatatui.Event.Resize{}` and the next
-    diff payload is full at the new dimensions.
-  - **Hook reports input** (`phx_ex_ratatui:input`) — decoded into an
-    `%ExRatatui.Event.Key{}` (or `%Event.Mouse{}` once that path
-    lands) and forwarded to the runtime via `Transport.push_event/2`.
-  - **Runtime emits a frame** (`{:phoenix_ex_ratatui, :render, diff}`) —
-    encoded via `Renderer.Html.encode_diff/1` and pushed to the hook
-    as a `phx_ex_ratatui:render` event.
-  - **LiveView exits** — the linked `ExRatatui.Server` runs its own
-    `terminate/2` (closes the `CellSession`, calls user `terminate/2`,
-    emits transport-disconnect telemetry). LiveView's `terminate/3` is
-    deliberately not relied on; per `phoenix-thinking`, it only fires
-    when the socket traps exits, which is unusual and brittle.
+    trigger an infinite client reconnect loop).
+  - **First `phx_ex_ratatui:resize`** — call `tui_mount_opts/1`, start
+    the Transport at `{cols, rows}` driving the generated `Runtime`
+    proxy.
+  - **Subsequent resizes** — `Transport.resize/3` updates the
+    `CellSession` and notifies the runtime.
+  - **Hook input** — decoded into an `%ExRatatui.Event.Key{}` and
+    forwarded via `Transport.push_event/2`.
+  - **Runtime emits a frame** — encoded via
+    `PhoenixExRatatui.Renderer.Html.encode_diff/1` and pushed as
+    a `phx_ex_ratatui:render` event.
+  - **Runtime exits** (App returned `{:stop, _}`, or crash) — we get
+    an EXIT signal, null out `:tui`, set `:tui_ended` so the user
+    sees a refresh prompt instead of a frozen-cells display.
 
   ## Options
 
-    * `:app` (required) — module implementing `ExRatatui.App` to drive.
     * `:container_id` — DOM id for the hook container. Defaults to
       `"phoenix-ex-ratatui"`. Override when embedding multiple TUI
       pages on the same router so the JS hook's `getElementById`
       queries don't collide.
 
-  ## Customising
+  ## Customising LiveView callbacks
 
-  The generated callbacks are marked `defoverridable`, so you can wrap
-  any of them with your own behaviour and call `super(...)`:
+  All LiveView callbacks (`mount/3`, `render/1`, `handle_event/3`,
+  `handle_info/2`) are `defoverridable`. You can wrap any of them and
+  call `super(...)`:
 
-      defmodule MyAppWeb.MyTuiLive do
-        use PhoenixExRatatui.LiveView, app: MyApp.Tui
-
-        @impl true
-        def mount(params, session, socket) do
-          {:ok, socket} = super(params, session, socket)
-          {:ok, assign(socket, :current_user, session["user_id"])}
-        end
+      def mount(params, session, socket) do
+        {:ok, socket} = super(params, session, socket)
+        {:ok, assign(socket, :title, "My TUI")}
       end
 
-  For deeper customisation (custom render, embedding alongside other
-  content), reach for `PhoenixExRatatui.LiveComponent` instead of this
-  macro.
+  For mixed pages where the TUI is one of several pieces of UI,
+  reach for `PhoenixExRatatui.LiveComponent` instead.
   """
 
   alias ExRatatui.Event.Key
@@ -89,10 +135,6 @@ defmodule PhoenixExRatatui.LiveView do
   @doc """
   Decodes the `phx_ex_ratatui:input` payload the JS hook sends into an
   `t:ExRatatui.Event.t/0`.
-
-  Exposed `pub` so users hand-rolling their own LiveView (without the
-  `__using__` macro) can reuse the same shape contract the bundled JS
-  hook speaks.
 
   Modifier strings are converted with `String.to_existing_atom/1` —
   the atoms (`:ctrl`, `:alt`, `:shift`, `:super`, `:hyper`, `:meta`)
@@ -113,79 +155,82 @@ defmodule PhoenixExRatatui.LiveView do
   end
 
   @doc """
-  Generates the full-page LiveView. See the moduledoc.
+  Generates the unified LiveView + App module. See the moduledoc.
   """
   defmacro __using__(opts) do
-    # Macro body is intentionally one line: macro-expansion code is
-    # compile-time and `mix test --cover` does not track it (cover
-    # instrumentation activates after lib/ has already compiled). By
-    # delegating to a regular function we keep the option-parsing
-    # path trackable via a runtime test, while preserving identical
-    # macro semantics for users.
+    # Macro body delegates to a regular function so the option-parsing
+    # path is trackable by `mix test --cover` (cover instrumentation
+    # doesn't see compile-time macro execution).
     __build_using_quote__(opts)
   end
 
   @doc false
-  # Builds the quoted block injected into a user's module at compile
-  # time. Public-but-undocumented (`@doc false`) so the test suite
-  # can call it directly to verify option handling without going
-  # through compile-time macro expansion.
-  #
-  # The quote block contains seven user-module callbacks (mount,
-  # render, two handle_event clauses, handle_info, defoverridable),
-  # which credo's cyclomatic-complexity scan counts as branches even
-  # though they're inert AST data inside this function — disabled
-  # because rewriting the quote in smaller pieces and stitching them
-  # together hurts readability for no real complexity reduction.
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def __build_using_quote__(opts) do
-    app = Keyword.fetch!(opts, :app)
     container_id = Keyword.get(opts, :container_id, "phoenix-ex-ratatui")
 
     quote location: :keep do
       use Phoenix.LiveView
 
-      @phoenix_ex_ratatui_app unquote(app)
       @phoenix_ex_ratatui_container_id unquote(container_id)
+      @phoenix_ex_ratatui_runtime_mod Module.concat(__MODULE__, "Runtime")
+
+      # ----- TUI callback defaults (all overridable) -----
+
+      @doc false
+      def tui_mount(_opts), do: {:ok, %{}}
+
+      @doc false
+      def tui_render(_state, _frame), do: []
+
+      @doc false
+      def tui_handle_event(_event, state), do: {:noreply, state}
+
+      @doc false
+      def tui_handle_info(_msg, state), do: {:noreply, state}
+
+      @doc false
+      def tui_terminate(_reason, _state), do: :ok
+
+      @doc false
+      def tui_mount_opts(_socket), do: []
+
+      defoverridable tui_mount: 1,
+                     tui_render: 2,
+                     tui_handle_event: 2,
+                     tui_handle_info: 2,
+                     tui_terminate: 2,
+                     tui_mount_opts: 1
+
+      # ----- Phoenix.LiveView callbacks -----
 
       @impl Phoenix.LiveView
       def mount(_params, _session, socket) do
         if Phoenix.LiveView.connected?(socket) do
-          # See moduledoc — without trap_exit a mount-failing TUI app
-          # would kill the LV and infinite-reconnect from the client.
+          # Without trap_exit a mount-failing TUI app would kill the LV
+          # and infinite-reconnect from the client.
           Process.flag(:trap_exit, true)
         end
 
-        # Fully-qualify `Phoenix.Component.assign/3` because users of
-        # `tui_live` get this code expanded inside their router's
-        # compile context, where `Plug.Conn.assign/3` is also
-        # imported and the bare call is ambiguous. Hand-rolled LV
-        # modules don't hit this — they don't import Plug.Conn —
-        # but we have to support both call sites.
         socket =
           socket
           |> Phoenix.Component.assign(:tui, nil)
           |> Phoenix.Component.assign(:tui_error, nil)
           |> Phoenix.Component.assign(:tui_ended, false)
-          |> Phoenix.Component.assign(:tui_app, @phoenix_ex_ratatui_app)
           |> Phoenix.Component.assign(:tui_container_id, @phoenix_ex_ratatui_container_id)
+          |> Phoenix.Component.assign(:tui_runtime_mod, @phoenix_ex_ratatui_runtime_mod)
 
         {:ok, socket}
       end
 
       @impl Phoenix.LiveView
       def render(var!(assigns)) do
-        # The `phx-update="ignore"` on the hook container is critical:
-        # the JS hook owns the cell-grid DOM after mount. We render
-        # any TUI error message in a SIBLING block so LV can update
-        # it without fighting the hook for control of the container's
-        # children.
         ~H"""
         <div
           id={@tui_container_id}
           phx-hook="PhoenixExRatatuiHook"
           phx-update="ignore"
-          data-phx-ex-ratatui-app={inspect(@tui_app)}
+          data-phx-ex-ratatui-runtime={inspect(@tui_runtime_mod)}
           style="width:100%;height:100vh"
         >
         </div>
@@ -207,7 +252,7 @@ defmodule PhoenixExRatatui.LiveView do
             socket
           )
           when is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
-        {:noreply, PhoenixExRatatui.LiveView.__handle_resize__(socket, cols, rows)}
+        {:noreply, PhoenixExRatatui.LiveView.__handle_resize__(socket, __MODULE__, cols, rows)}
       end
 
       def handle_event("phx_ex_ratatui:input", payload, socket) when is_map(payload) do
@@ -217,41 +262,81 @@ defmodule PhoenixExRatatui.LiveView do
       @impl Phoenix.LiveView
       def handle_info({:phoenix_ex_ratatui, :render, diff}, socket) do
         {:noreply,
-         PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_app, diff)}
+         PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_runtime_mod, diff)}
       end
 
-      # The runtime server is linked to this LV (via Transport.start_link).
-      # When the App returns `{:stop, _}`, the server exits cleanly and
-      # we get an EXIT signal. Without this clause the painted cells
-      # stay on screen but no events flow — a confusing "frozen TUI"
-      # state. We catch the EXIT, null out the refs, and flip
-      # `:tui_ended` so render/1 shows a refresh prompt.
       def handle_info({:EXIT, server_pid, _reason}, socket) do
         {:noreply, PhoenixExRatatui.LiveView.__handle_server_exit__(socket, server_pid)}
       end
 
       defoverridable mount: 3, render: 1, handle_event: 3, handle_info: 2
+
+      # Generates the sibling `__MODULE__.Runtime` proxy that conforms
+      # to `ExRatatui.App` by delegating to this module's `tui_*`
+      # callbacks. See the moduledoc for the rationale.
+      @after_compile {PhoenixExRatatui.LiveView, :__define_runtime__}
     end
   end
 
   @doc false
-  # Internal helper for the resize event handler — kept on the parent
-  # module rather than expanded into every user's `__using__` so the
-  # generated code stays small and clippy/credo-clean.
-  def __handle_resize__(socket, cols, rows) do
+  # Compile-time hook called via `@after_compile`. Builds a sibling
+  # module (`UserMod.Runtime`) that uses `ExRatatui.App` and delegates
+  # every behaviour callback to the user module's `tui_*` functions.
+  # This lets the unified module appear to implement both behaviours
+  # without colliding on `handle_info/2` (same arity, different
+  # semantics).
+  def __define_runtime__(env, _bytecode) do
+    user_mod = env.module
+    runtime_mod = Module.concat(user_mod, "Runtime")
+
+    body =
+      quote do
+        use ExRatatui.App
+
+        @impl ExRatatui.App
+        def mount(opts), do: unquote(user_mod).tui_mount(opts)
+
+        @impl ExRatatui.App
+        def render(state, frame), do: unquote(user_mod).tui_render(state, frame)
+
+        @impl ExRatatui.App
+        def handle_event(event, state),
+          do: unquote(user_mod).tui_handle_event(event, state)
+
+        @impl ExRatatui.App
+        def handle_info(msg, state),
+          do: unquote(user_mod).tui_handle_info(msg, state)
+
+        @impl ExRatatui.App
+        def terminate(reason, state),
+          do: unquote(user_mod).tui_terminate(reason, state)
+      end
+
+    Module.create(runtime_mod, body, file: env.file, line: env.line)
+    :ok
+  end
+
+  @doc false
+  def __handle_resize__(socket, user_mod, cols, rows) do
     case socket.assigns.tui do
-      nil -> __start_transport__(socket, cols, rows)
+      nil -> __start_transport__(socket, user_mod, cols, rows)
       refs -> __resize_transport__(socket, refs, cols, rows)
     end
   end
 
-  defp __start_transport__(socket, cols, rows) do
-    case Transport.start_link(
-           mod: socket.assigns.tui_app,
-           width: cols,
-           height: rows,
-           target: self()
-         ) do
+  defp __start_transport__(socket, user_mod, cols, rows) do
+    runtime_mod = Module.concat(user_mod, "Runtime")
+    mount_opts = user_mod.tui_mount_opts(socket)
+
+    start_link_opts =
+      [
+        mod: runtime_mod,
+        width: cols,
+        height: rows,
+        target: self()
+      ] ++ mount_opts
+
+    case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
         Phoenix.Component.assign(socket, :tui, refs)
 
@@ -268,10 +353,6 @@ defmodule PhoenixExRatatui.LiveView do
   end
 
   @doc false
-  # Detect when the linked runtime server has exited and surface the
-  # "TUI session ended" state to the user. We match on the server pid
-  # via the assigns to ignore EXIT signals from any unrelated linked
-  # process (e.g. a user-opened Task in their own mount/3 override).
   def __handle_server_exit__(socket, server_pid) do
     case socket.assigns[:tui] do
       %{server: ^server_pid} ->
@@ -285,13 +366,6 @@ defmodule PhoenixExRatatui.LiveView do
   end
 
   @doc false
-  # Internal helper for the render-frame info message. Encoding the
-  # diff lives here (rather than inline in the macro-generated
-  # handle_info) so the quote block doesn't carry a fully-qualified
-  # reference to PhoenixExRatatui.Renderer.Html — keeps the macro
-  # output small and the module aliases tidy. Wraps the encode +
-  # push_event work in a `[:phoenix_ex_ratatui, :render, :frame]`
-  # span so per-frame Phoenix-side cost is observable in metrics.
   def __push_render__(socket, mod, diff) do
     meta = %{mod: mod, width: diff.width, height: diff.height, ops_count: length(diff.ops)}
 
@@ -301,18 +375,9 @@ defmodule PhoenixExRatatui.LiveView do
   end
 
   @doc false
-  # Internal helper for the input event handler. Emits a
-  # `[:phoenix_ex_ratatui, :input, :forward]` event so consumers can
-  # count input rates / latencies; the actual push_event/2 to the
-  # runtime is forwarded after the telemetry call so a slow handler
-  # never blocks input dispatch.
   def __handle_input__(socket, payload) do
     case socket.assigns.tui do
       nil ->
-        # Hook fired input before the resize — odd but possible during
-        # browser resize storms. Drop it; the Transport isn't started
-        # yet so there's nowhere to send it. The next render will
-        # repaint and the user can retry the input.
         socket
 
       refs ->

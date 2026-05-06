@@ -18,9 +18,9 @@ defmodule DemoWeb.AdminLive do
       <h1>Admin Dashboard</h1>
 
       <p>
-        The widget below is an <code>ExRatatui.App</code> running inside a
-        <code>PhoenixExRatatui.LiveComponent</code>. It lives on the same page as
-        this regular Phoenix-rendered prose. Resize the window or focus the
+        The widget below is a unified-module
+        <code>PhoenixExRatatui.LiveComponent</code> running inside this
+        regular Phoenix-rendered page. Resize the window or focus the
         TUI and press <kbd>+</kbd> / <kbd>-</kbd> — frames flow over the
         LiveView socket as cell deltas.
       </p>
@@ -32,18 +32,15 @@ defmodule DemoWeb.AdminLive do
              to render. Without this, the hook would fall back to its
              default 80x24 cells and overflow the section. -->
         <div style="height: 22em;">
-          <.live_component
-            module={PhoenixExRatatui.LiveComponent}
-            id="admin-counter"
-            app={Demo.Counter}
-          />
+          <.live_component module={DemoWeb.CounterPanel} id="admin-counter" />
         </div>
       </section>
 
       <p>
-        For the same App as a full-page route — no surrounding chrome,
-        no container — see <a href="/counter">/counter</a>, which uses
-        the <code>tui_live</code> router shortcut.
+        For the same TUI logic as a full-page route — no surrounding
+        chrome, no container — see <a href="/counter">/counter</a>,
+        which mounts <code>DemoWeb.CounterLive</code> directly via the
+        router's regular <code>live/3</code> macro.
       </p>
     </main>
     """

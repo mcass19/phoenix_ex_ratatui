@@ -9,55 +9,83 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 
 `PhoenixExRatatui` is the LiveView counterpart to [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui): a thin transport that pipes the runtime's rendered **cell buffer** to the browser, where a small JS hook paints cells directly into the DOM as `<span>` elements. No terminal emulator, no ANSI on the wire — just structured cell deltas over the LiveView socket. Phones get real touch events.
 
-## Three ways to mount a TUI
+## Two ways to mount a TUI
 
-Pick the one that matches your project layout:
-
-```elixir
-# 1. One-line full-page route. Lowest boilerplate.
-defmodule MyAppWeb.Router do
-  use Phoenix.Router
-  import PhoenixExRatatui.Router
-
-  scope "/", MyAppWeb do
-    pipe_through :browser
-    tui_live "/tui", MyApp.Tui
-  end
-end
-```
+Both shapes are **unified modules** — the same module is both a Phoenix LiveView/LiveComponent and the `ExRatatui.App` driving it. The macro auto-generates a hidden `Module.Runtime` proxy that conforms to `ExRatatui.App` by delegating to your `tui_*` callbacks.
 
 ```elixir
-# 2. Explicit full-page LiveView. Use when you need to override
-# mount/3, render/1, or thread per-route assigns from the session.
+# 1. Full-page TUI route — same module is both the Phoenix.LiveView
+#    and the App.
 defmodule MyAppWeb.MyTuiLive do
-  use PhoenixExRatatui.LiveView, app: MyApp.Tui
+  use PhoenixExRatatui.LiveView
+
+  def tui_mount(_opts), do: {:ok, %{count: 0}}
+
+  def tui_render(state, frame) do
+    alias ExRatatui.Layout.Rect
+    alias ExRatatui.Widgets.Paragraph
+    [{%Paragraph{text: "Count: #{state.count}"},
+      %Rect{x: 0, y: 0, width: frame.width, height: frame.height}}]
+  end
+
+  def tui_handle_event(%ExRatatui.Event.Key{code: "+"}, state),
+    do: {:noreply, %{state | count: state.count + 1}}
+
+  def tui_handle_event(%ExRatatui.Event.Key{code: "q"}, state),
+    do: {:stop, state}
+
+  def tui_handle_event(_event, state), do: {:noreply, state}
 end
 
-# router:
+# In your router (no special macro):
 live "/tui", MyAppWeb.MyTuiLive
 ```
 
 ```elixir
-# 3. Embedded LiveComponent. Use when the TUI lives alongside other
-# content in your own LiveView (admin dashboards, dev consoles, etc.).
+# 2. Embedded LiveComponent — same shape, drops a TUI inside an
+#    existing LiveView's render alongside non-TUI content.
+defmodule MyAppWeb.AdminCounterPanel do
+  use PhoenixExRatatui.LiveComponent
+
+  def tui_mount(_opts), do: {:ok, %{n: 0}}
+  def tui_render(state, frame), do: # ...
+  def tui_handle_event(_event, state), do: {:noreply, state}
+end
+
 defmodule MyAppWeb.AdminLive do
   use Phoenix.LiveView
 
   def render(assigns) do
     ~H"""
     <h1>Admin Dashboard</h1>
-    <.live_component
-      module={PhoenixExRatatui.LiveComponent}
-      id="admin-tui"
-      app={MyApp.AdminTui}
-    />
+    <.live_component module={MyAppWeb.AdminCounterPanel} id="admin-tui" />
     <p>Other admin content</p>
     """
   end
 end
 ```
 
-All three drive the same `PhoenixExRatatui.Transport` underneath — a `CellSession` + `ExRatatui.Server` pair that ships rendered cell diffs to the browser as `phx_ex_ratatui:render` events.
+Both drive the same `PhoenixExRatatui.Transport` underneath — a `CellSession` + `ExRatatui.Server` pair that ships rendered cell diffs to the browser as `phx_ex_ratatui:render` events.
+
+## Threading socket data into the App
+
+LiveView assigns and TUI state live in different processes. The `tui_mount_opts/1` callback is the bridge — it receives the LiveView socket and returns the keyword list passed as `opts` to `tui_mount/1`:
+
+```elixir
+defmodule MyAppWeb.AdminTui do
+  use PhoenixExRatatui.LiveView
+
+  @impl Phoenix.LiveView
+  def mount(_params, session, socket) do
+    {:ok, socket} = super(nil, nil, socket)
+    {:ok, assign(socket, :user_id, session["user_id"])}
+  end
+
+  def tui_mount_opts(socket), do: [user_id: socket.assigns.user_id]
+
+  def tui_mount(opts), do: {:ok, %{user_id: opts[:user_id]}}
+end
+```
 
 ## Wiring the JS hook
 
@@ -106,11 +134,10 @@ After the next ex_ratatui release lands, this flips to:
 
 ## Quick links
 
-- [Getting Started guide](guides/getting_started.md) — extended walkthrough of all three APIs
-- [`examples/demo/`](examples/demo/) — minimal Phoenix app exercising `tui_live` and `LiveComponent` side-by-side
-- [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the macro
-- [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable
-- [`PhoenixExRatatui.Router`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Router.html) — the `tui_live` macro
+- [Getting Started guide](guides/getting_started.md) — extended walkthrough of both APIs
+- [`examples/demo/`](examples/demo/) — minimal Phoenix app with the unified LV and LC side-by-side
+- [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the full-page macro
+- [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable macro
 - [`PhoenixExRatatui.Telemetry`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Telemetry.html) — `:telemetry` events catalogue + `Telemetry.Metrics` wiring example
 - [CONTRIBUTING.md](CONTRIBUTING.md) — local-dev setup
 
