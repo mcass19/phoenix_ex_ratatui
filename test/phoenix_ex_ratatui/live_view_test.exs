@@ -383,8 +383,8 @@ defmodule PhoenixExRatatui.LiveViewTest do
       end)
 
       html = render(view)
-      assert html =~ "TUI session ended"
-      assert html =~ "Refresh"
+      assert html =~ "tui session ended"
+      assert html =~ "[refresh]"
     end
 
     test "input after resize forwards to the Transport and triggers a re-render" do

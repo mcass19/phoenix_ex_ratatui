@@ -232,8 +232,9 @@ defmodule PhoenixExRatatui.LiveView do
           <p class="phoenix-ex-ratatui-error">TUI error: {@tui_error}</p>
         <% end %>
         <%= if @tui_ended do %>
-          <p class="phoenix-ex-ratatui-ended" style="position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#222;border:1px solid #555;border-radius:4px;">
-            TUI session ended. <a href="" style="color:#729fcf;">Refresh</a> to restart.
+          <p class="phoenix-ex-ratatui-ended" style="position:fixed;top:1rem;right:1rem;margin:0;padding:0.5rem 0.85rem;background:#0f0c14;border:1px solid #75507b;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.85rem;color:#e9e4f5;box-shadow:0 0 0 1px #0f0c14, 0 4px 18px rgba(0,0,0,0.4);">
+            🖥️  <span style="color:#ad7fa8;">~$</span> tui session ended.
+            <a href="" style="color:#ad7fa8;text-decoration:underline;">[refresh]</a> to restart.
           </p>
         <% end %>
         """
