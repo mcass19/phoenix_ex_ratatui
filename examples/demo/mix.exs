@@ -8,6 +8,9 @@ defmodule Demo.MixProject do
       elixir: "~> 1.17",
       elixirc_paths: ["lib"],
       start_permanent: Mix.env() == :prod,
+      # Phoenix 1.8's CodeReloader registers via Mix's listeners API.
+      # Without this, every code-reloading request logs a warning.
+      listeners: [Phoenix.CodeReloader],
       deps: deps()
     ]
   end

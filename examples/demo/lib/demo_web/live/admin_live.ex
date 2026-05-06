@@ -27,11 +27,17 @@ defmodule DemoWeb.AdminLive do
 
       <section style="margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px;">
         <h2 style="margin-top: 0;">Live counter (TUI)</h2>
-        <.live_component
-          module={PhoenixExRatatui.LiveComponent}
-          id="admin-counter"
-          app={Demo.Counter}
-        />
+        <!-- The LiveComponent fills its parent (width: 100%; height: 100%).
+             We give the wrapping div an explicit height so there's room
+             to render. Without this, the hook would fall back to its
+             default 80x24 cells and overflow the section. -->
+        <div style="height: 22em;">
+          <.live_component
+            module={PhoenixExRatatui.LiveComponent}
+            id="admin-counter"
+            app={Demo.Counter}
+          />
+        </div>
       </section>
 
       <p>
