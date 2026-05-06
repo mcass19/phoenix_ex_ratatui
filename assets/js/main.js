@@ -141,6 +141,7 @@ export const PhoenixExRatatuiHook = {
     }
     if (!this.el.style.whiteSpace) this.el.style.whiteSpace = "pre";
     if (!this.el.style.lineHeight) this.el.style.lineHeight = "1";
+    if (!this.el.style.overflow) this.el.style.overflow = "hidden";
 
     this.measureChar();
     this.reportSize();
@@ -173,9 +174,21 @@ export const PhoenixExRatatuiHook = {
   reportSize() {
     if (!this.charWidth || !this.charHeight) return;
     const rect = this.el.getBoundingClientRect();
-    const cols = Math.max(1, Math.floor(rect.width / this.charWidth));
-    const rows = Math.max(1, Math.floor(rect.height / this.charHeight));
-    this.pushEvent("phx_ex_ratatui:resize", { cols, rows });
+    let cols = Math.floor(rect.width / this.charWidth);
+    let rows = Math.floor(rect.height / this.charHeight);
+
+    // If the container has no concrete size yet (empty parent with
+    // no explicit dimensions, or `display: none` ancestor while the
+    // page is rendering), fall back to a conventional 80x24 default.
+    // The painted cells will then drive the container's size, and a
+    // subsequent ResizeObserver fire reports the real measurement
+    // once the layout settles.
+    if (cols < 1 || rows < 1) {
+      cols = 80;
+      rows = 24;
+    }
+
+    this.pushEventTo(this.el, "phx_ex_ratatui:resize", { cols, rows });
   },
 
   applyDiff({ width, height, ops }) {
@@ -229,7 +242,7 @@ export const PhoenixExRatatuiHook = {
 
   onKeydown(event) {
     event.preventDefault();
-    this.pushEvent("phx_ex_ratatui:input", {
+    this.pushEventTo(this.el, "phx_ex_ratatui:input", {
       kind: "key",
       code: keyToCode(event),
       modifiers: modifiersFor(event),
