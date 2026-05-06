@@ -156,12 +156,18 @@ defmodule PhoenixExRatatui.LiveView do
           Process.flag(:trap_exit, true)
         end
 
+        # Fully-qualify `Phoenix.Component.assign/3` because users of
+        # `tui_live` get this code expanded inside their router's
+        # compile context, where `Plug.Conn.assign/3` is also
+        # imported and the bare call is ambiguous. Hand-rolled LV
+        # modules don't hit this — they don't import Plug.Conn —
+        # but we have to support both call sites.
         socket =
           socket
-          |> assign(:tui, nil)
-          |> assign(:tui_error, nil)
-          |> assign(:tui_app, @phoenix_ex_ratatui_app)
-          |> assign(:tui_container_id, @phoenix_ex_ratatui_container_id)
+          |> Phoenix.Component.assign(:tui, nil)
+          |> Phoenix.Component.assign(:tui_error, nil)
+          |> Phoenix.Component.assign(:tui_app, @phoenix_ex_ratatui_app)
+          |> Phoenix.Component.assign(:tui_container_id, @phoenix_ex_ratatui_container_id)
 
         {:ok, socket}
       end
