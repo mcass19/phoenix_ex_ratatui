@@ -10,12 +10,18 @@ defmodule DemoWeb.ChatLive do
 
   ## Controls
 
-    * `Ctrl+S` — send message
-    * `Enter` — newline (or pick autocomplete suggestion)
+  Mimics common AI-chat keybindings — no `Ctrl` modifiers, since the
+  page is rendered inside the browser (browser shortcuts can swallow
+  them) and the textarea NIF doesn't accept the atom-form modifiers
+  the LiveView hook produces.
+
+    * `Enter` — send message (or pick autocomplete suggestion)
+    * `Shift+Enter` — newline
     * `/` — trigger slash command autocomplete
-    * `Escape` — close autocomplete popup
+    * `Esc` — close autocomplete popup
     * `Up`/`Down` — navigate autocomplete or scroll messages
-    * `Ctrl+Q` — back to the home screen (emits `{:navigate, "/"}`)
+    * `/home` — back to the landing TUI
+    * `/admin` — jump to the admin dashboard
   """
   use PhoenixExRatatui.LiveView
 
@@ -24,6 +30,8 @@ defmodule DemoWeb.ChatLive do
   alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
+
+  alias ExRatatui.Text.Span
 
   alias ExRatatui.Widgets.{
     Block,
@@ -43,7 +51,8 @@ defmodule DemoWeb.ChatLive do
     %Command{name: "clear", description: "Clear chat history"},
     %Command{name: "model", description: "Switch AI model"},
     %Command{name: "system", description: "Set system prompt"},
-    %Command{name: "back", description: "Return to home screen", aliases: ["home"]}
+    %Command{name: "home", description: "Return to landing TUI", aliases: ["back"]},
+    %Command{name: "admin", description: "Open admin dashboard"}
   ]
 
   @ai_responses [
@@ -54,8 +63,8 @@ defmodule DemoWeb.ChatLive do
     Try asking me anything, or use `/help` for commands.
 
     - **Markdown rendering** — this whole bubble is rendered by `Markdown`
-    - **Slash commands** — type `/` to see autocomplete
-    - **Multi-line input** — `Enter` for newline, `Ctrl+S` to send
+    - **Slash commands** — type `/` to see autocomplete (try `/home`, `/admin`)
+    - **Multi-line input** — `Enter` to send, `Shift+Enter` for a newline
     """,
     """
     Sure! Here's a quick example:
@@ -118,22 +127,14 @@ defmodule DemoWeb.ChatLive do
   def tui_render(state, frame) do
     area = %Rect{x: 0, y: 0, width: frame.width, height: frame.height}
 
-    [header_area, messages_area, input_area, footer_area] =
+    [messages_area, input_area, footer_area] =
       Layout.split(area, :vertical, [
-        {:length, 1},
         {:min, 5},
         {:length, 5},
         {:length, 1}
       ])
 
     widgets = []
-
-    header = %Paragraph{
-      text: "  phoenix_ex_ratatui — chat",
-      style: %Style{fg: :cyan, modifiers: [:bold]}
-    }
-
-    widgets = [{header, header_area} | widgets]
 
     msg_content_area = %Rect{
       x: messages_area.x,
@@ -152,7 +153,7 @@ defmodule DemoWeb.ChatLive do
       position: state.scroll_offset,
       orientation: :vertical_right,
       viewport_content_length: visible_height,
-      thumb_style: %Style{fg: :cyan},
+      thumb_style: %Style{fg: :light_magenta},
       track_style: %Style{fg: :dark_gray}
     }
 
@@ -191,13 +192,13 @@ defmodule DemoWeb.ChatLive do
       state: state.textarea,
       style: %Style{fg: :white},
       cursor_style: %Style{bg: :white, fg: :black},
-      placeholder: "Type a message... (Ctrl+S to send, / for commands)",
+      placeholder: "Type a message... (Enter to send, Shift+Enter for newline, / for commands)",
       placeholder_style: %Style{fg: :dark_gray},
       block: %Block{
         title: "Message",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :blue}
+        border_style: %Style{fg: :magenta}
       }
     }
 
@@ -205,10 +206,9 @@ defmodule DemoWeb.ChatLive do
 
     footer =
       UI.nav_hints([
-        {"Ctrl+S", "send"},
-        {"Enter", "newline"},
-        {"/", "commands"},
-        {"Ctrl+Q", "home"}
+        {"Enter", "send"},
+        {"Shift+Enter", "newline"},
+        {"/", "commands"}
       ])
 
     widgets = [{footer, footer_area} | widgets]
@@ -221,7 +221,7 @@ defmodule DemoWeb.ChatLive do
             selected: state.autocomplete_selected,
             percent_width: 40,
             percent_height: 30,
-            highlight_style: %Style{fg: :black, bg: :cyan, modifiers: [:bold]}
+            highlight_style: %Style{fg: :black, bg: :light_magenta, modifiers: [:bold]}
           )
 
         popup_widgets ++ widgets
@@ -238,7 +238,7 @@ defmodule DemoWeb.ChatLive do
         {:user, text} ->
           label = %Paragraph{
             text: " You ",
-            style: %Style{fg: :black, bg: :green, modifiers: [:bold]}
+            style: %Style{fg: :black, bg: :light_blue, modifiers: [:bold]}
           }
 
           content = %Paragraph{text: text, style: %Style{fg: :white}, wrap: true}
@@ -250,7 +250,7 @@ defmodule DemoWeb.ChatLive do
         {:ai, text} ->
           label = %Paragraph{
             text: " AI ",
-            style: %Style{fg: :black, bg: :magenta, modifiers: [:bold]}
+            style: %Style{fg: :black, bg: :light_magenta, modifiers: [:bold]}
           }
 
           content = %Markdown{content: String.trim(text), wrap: true}
@@ -264,10 +264,13 @@ defmodule DemoWeb.ChatLive do
       items: items,
       scroll_offset: state.scroll_offset,
       block: %Block{
-        title: "Chat (#{length(state.messages)} messages)",
+        title: %Span{
+          content: " ~/phoenix_ex_ratatui/chat (#{length(state.messages)} msgs) ",
+          style: %Style{fg: :light_magenta, modifiers: [:bold]}
+        },
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: %Style{fg: :magenta}
       }
     }
   end
@@ -284,37 +287,30 @@ defmodule DemoWeb.ChatLive do
 
   # -- Events --
 
-  # Guards can't `in` a runtime list; defer the modifier check to the
-  # body and dispatch via a small helper.
-  def tui_handle_event(%Key{code: "q", modifiers: mods}, state) do
-    if ctrl?(mods) do
-      {:noreply, state, intents: [{:navigate, "/"}]}
-    else
-      ExRatatui.textarea_handle_key(state.textarea, "q", mods)
-      {:noreply, check_slash_command(state)}
+  # Enter alone sends; Shift+Enter inserts a newline. Mirrors how
+  # most AI chat surfaces (Claude.ai, ChatGPT, Slack) behave. If the
+  # textarea contents resolve to an exact slash command, execute it
+  # directly so `/home<Enter>` and `/admin<Enter>` always navigate
+  # — even if the popup logic somehow lost the selection.
+  def tui_handle_event(%Key{code: "enter", modifiers: mods}, state) do
+    cond do
+      :shift in mods ->
+        ExRatatui.textarea_handle_key(state.textarea, "enter", [])
+        {:noreply, state}
+
+      command = exact_command(state) ->
+        execute_specific(state, command)
+
+      state.show_autocomplete ->
+        execute_command(state)
+
+      true ->
+        {:noreply, submit_message(state), commands: throbber_tick_command(true)}
     end
   end
 
   def tui_handle_event(%Key{code: "escape"}, state) do
     {:noreply, %{state | show_autocomplete: false}}
-  end
-
-  def tui_handle_event(%Key{code: "s", modifiers: mods}, state) do
-    if ctrl?(mods) do
-      {:noreply, submit_message(state), commands: throbber_tick_command(true)}
-    else
-      ExRatatui.textarea_handle_key(state.textarea, "s", mods)
-      {:noreply, check_slash_command(state)}
-    end
-  end
-
-  def tui_handle_event(%Key{code: "enter"}, state) do
-    if state.show_autocomplete do
-      execute_command(state)
-    else
-      ExRatatui.textarea_handle_key(state.textarea, "enter", [])
-      {:noreply, state}
-    end
   end
 
   def tui_handle_event(%Key{code: "up"}, state) do
@@ -336,15 +332,35 @@ defmodule DemoWeb.ChatLive do
     end
   end
 
-  def tui_handle_event(%Key{code: code, modifiers: mods}, state) do
-    ExRatatui.textarea_handle_key(state.textarea, code, mods)
-    {:noreply, check_slash_command(state)}
+  # Catch-all: forward to textarea, but swallow ctrl/alt/meta combos —
+  # the textarea NIF expects string modifiers, but the LiveView hook
+  # delivers atoms. Forwarding `[:ctrl]` would crash the runtime and
+  # end the session (the source of the "any Ctrl key quits" bug).
+  def tui_handle_event(%Key{code: code, modifiers: mods}, state) when is_list(mods) do
+    if Enum.any?(mods, &(&1 in [:ctrl, :alt, :meta, :super, :hyper])) do
+      {:noreply, state}
+    else
+      string_mods = Enum.map(mods, &Atom.to_string/1)
+      ExRatatui.textarea_handle_key(state.textarea, code, string_mods)
+      {:noreply, check_slash_command(state)}
+    end
   end
 
   def tui_handle_event(_event, state), do: {:noreply, state}
 
-  defp ctrl?(mods) when is_list(mods), do: :ctrl in mods
-  defp ctrl?(_), do: false
+  defp exact_command(state) do
+    value = state.textarea |> ExRatatui.textarea_get_value() |> String.trim()
+
+    case SlashCommands.parse(value) do
+      {:command, name} ->
+        Enum.find(@commands, fn cmd ->
+          name == cmd.name or name in cmd.aliases
+        end)
+
+      :no_command ->
+        nil
+    end
+  end
 
   # -- Loading / throbber tick --
 
@@ -416,43 +432,51 @@ defmodule DemoWeb.ChatLive do
 
   defp execute_command(state) do
     case Enum.at(state.autocomplete_matches, state.autocomplete_selected) do
-      nil ->
-        {:noreply, state}
-
-      %Command{name: "clear"} ->
-        ExRatatui.textarea_set_value(state.textarea, "")
-        {:noreply, %{state | messages: [], show_autocomplete: false, scroll_offset: 0}}
-
-      %Command{name: "back"} ->
-        ExRatatui.textarea_set_value(state.textarea, "")
-        {:noreply, %{state | show_autocomplete: false}, intents: [{:navigate, "/"}]}
-
-      %Command{name: "help"} ->
-        ExRatatui.textarea_set_value(state.textarea, "")
-
-        help = """
-        # Available Commands
-
-        | Command | Description |
-        |---------|-------------|
-        | `/help` | Show this help message |
-        | `/clear` | Clear chat history |
-        | `/model` | Switch AI model |
-        | `/system` | Set system prompt |
-        | `/back` | Return to home screen |
-
-        **Keyboard shortcuts:** `Ctrl+S` send · `Enter` newline ·
-        `Ctrl+Q` home · `Up/Down` scroll
-        """
-
-        {:noreply, %{state | messages: state.messages ++ [{:ai, help}], show_autocomplete: false}}
-
-      %Command{name: name} ->
-        ExRatatui.textarea_set_value(state.textarea, "")
-
-        msg = "Command `/#{name}` is not implemented yet."
-
-        {:noreply, %{state | messages: state.messages ++ [{:ai, msg}], show_autocomplete: false}}
+      nil -> {:noreply, state}
+      command -> execute_specific(state, command)
     end
+  end
+
+  defp execute_specific(state, %Command{name: "clear"}) do
+    ExRatatui.textarea_set_value(state.textarea, "")
+    {:noreply, %{state | messages: [], show_autocomplete: false, scroll_offset: 0}}
+  end
+
+  defp execute_specific(state, %Command{name: "home"}) do
+    ExRatatui.textarea_set_value(state.textarea, "")
+    {:noreply, %{state | show_autocomplete: false}, intents: [{:navigate, "/"}]}
+  end
+
+  defp execute_specific(state, %Command{name: "admin"}) do
+    ExRatatui.textarea_set_value(state.textarea, "")
+    {:noreply, %{state | show_autocomplete: false}, intents: [{:navigate, "/admin"}]}
+  end
+
+  defp execute_specific(state, %Command{name: "help"}) do
+    ExRatatui.textarea_set_value(state.textarea, "")
+
+    help = """
+    # Available Commands
+
+    | Command | Description |
+    |---------|-------------|
+    | `/help` | Show this help message |
+    | `/clear` | Clear chat history |
+    | `/model` | Switch AI model |
+    | `/system` | Set system prompt |
+    | `/home` | Return to landing TUI |
+    | `/admin` | Open admin dashboard |
+
+    **Keyboard shortcuts:** `Enter` send · `Shift+Enter` newline ·
+    `/` commands · `Up/Down` scroll
+    """
+
+    {:noreply, %{state | messages: state.messages ++ [{:ai, help}], show_autocomplete: false}}
+  end
+
+  defp execute_specific(state, %Command{name: name}) do
+    ExRatatui.textarea_set_value(state.textarea, "")
+    msg = "Command `/#{name}` is not implemented yet."
+    {:noreply, %{state | messages: state.messages ++ [{:ai, msg}], show_autocomplete: false}}
   end
 end
