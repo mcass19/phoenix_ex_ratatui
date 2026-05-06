@@ -55,6 +55,7 @@ defmodule PhoenixExRatatui.Telemetry do
   | ----- | ----------- | ------------ | -------- |
   | `[:phoenix_ex_ratatui, :transport, :disconnect]` | `Transport.stop/2` was called and the runtime server is being torn down. Does not fire on linked-process EXIT — `ex_ratatui`'s own `[:ex_ratatui, :transport, :disconnect]` covers that path. | `%{system_time: integer}` | `:mod`, `:reason` |
   | `[:phoenix_ex_ratatui, :input, :forward]` | A decoded client input is forwarded to the runtime via `Transport.push_event/2`. | `%{system_time: integer}` | `:mod`, `:event` |
+  | `[:phoenix_ex_ratatui, :intent, :dispatch]` | A runtime intent was dispatched to the LV/LC socket (e.g. `{:navigate, "/path"}` → `push_navigate`). Fires once per intent, regardless of recognised vs unrecognised. | `%{system_time: integer}` | `:intent` |
 
   ## Attaching a default logger
 

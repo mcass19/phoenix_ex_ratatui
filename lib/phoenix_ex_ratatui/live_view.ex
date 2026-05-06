@@ -265,6 +265,10 @@ defmodule PhoenixExRatatui.LiveView do
          PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_runtime_mod, diff)}
       end
 
+      def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+        {:noreply, PhoenixExRatatui.LiveView.__handle_intent__(socket, intent)}
+      end
+
       def handle_info({:EXIT, server_pid, _reason}, socket) do
         {:noreply, PhoenixExRatatui.LiveView.__handle_server_exit__(socket, server_pid)}
       end
@@ -372,6 +376,58 @@ defmodule PhoenixExRatatui.LiveView do
     Telemetry.span([:render, :frame], meta, fn ->
       Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
     end)
+  end
+
+  @doc """
+  Dispatches a runtime intent against a LiveView socket.
+
+  Intents are emitted by an `ExRatatui.App` from `tui_handle_event/2`
+  or `tui_handle_info/2` via the third element of a `{:noreply, state,
+  intents: [...]}` (or `{:stop, ...}`) transition. They flow through
+  `ExRatatui.Server`'s `intent_writer_fn` to this LV, where this
+  helper maps the intent shape to the equivalent Phoenix LV action.
+
+  Recognised intents:
+
+    * `{:navigate, path}` — `Phoenix.LiveView.push_navigate(socket, to: path)`
+    * `{:patch, path}` — `Phoenix.LiveView.push_patch(socket, to: path)`
+    * `{:redirect, path}` — `Phoenix.LiveView.redirect(socket, to: path)`
+    * `{:redirect, [external: url]}` — external redirect
+
+  Unrecognised intents are dropped and logged at warning level. This
+  keeps a TUI app forward-compatible: a future intent the consumer
+  doesn't know how to handle yet won't crash the LV.
+
+  Public so `PhoenixExRatatui.LiveComponent` can reuse the same
+  dispatch table.
+  """
+  @spec dispatch_intent(Phoenix.LiveView.Socket.t(), term()) :: Phoenix.LiveView.Socket.t()
+  def dispatch_intent(socket, {:navigate, path}) when is_binary(path) do
+    Phoenix.LiveView.push_navigate(socket, to: path)
+  end
+
+  def dispatch_intent(socket, {:patch, path}) when is_binary(path) do
+    Phoenix.LiveView.push_patch(socket, to: path)
+  end
+
+  def dispatch_intent(socket, {:redirect, path}) when is_binary(path) do
+    Phoenix.LiveView.redirect(socket, to: path)
+  end
+
+  def dispatch_intent(socket, {:redirect, [external: url]}) when is_binary(url) do
+    Phoenix.LiveView.redirect(socket, external: url)
+  end
+
+  def dispatch_intent(socket, intent) do
+    require Logger
+    Logger.warning("phoenix_ex_ratatui: dropped unrecognised intent #{inspect(intent)}")
+    socket
+  end
+
+  @doc false
+  def __handle_intent__(socket, intent) do
+    Telemetry.execute([:intent, :dispatch], %{}, %{intent: intent})
+    dispatch_intent(socket, intent)
   end
 
   @doc false

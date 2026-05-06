@@ -96,6 +96,12 @@ defmodule PhoenixExRatatui.Transport do
       `Phoenix.LiveView.send_update/3` instead, since LiveComponents
       have no `handle_info/2` and must receive updates via
       `update/2`.
+    * `:intent_writer` (optional) — a 1-arity function called with each
+      runtime intent (e.g. `{:navigate, "/path"}`). Defaults to a
+      function that sends `{:phoenix_ex_ratatui, :intent, intent}` to
+      `:target`. `PhoenixExRatatui.LiveComponent` overrides this to
+      route intents through `Phoenix.LiveView.send_update/3` for the
+      same reason as `:writer`.
     * Any other option — passed through verbatim to `mod.mount/1`. Use
       this to thread per-connection context (current user, params,
       LiveView socket id) into the App without a global registry.
@@ -117,24 +123,29 @@ defmodule PhoenixExRatatui.Transport do
     height = Keyword.fetch!(opts, :height)
     mod = Keyword.fetch!(opts, :mod)
 
-    unless is_pid(target) and is_integer(width) and width > 0 and is_integer(height) and
-             height > 0 do
-      raise ArgumentError,
-            "expected :target as pid and :width / :height as positive integers, got: " <>
-              inspect(target: target, width: width, height: height)
-    end
+    validate_required!(target, width, height)
 
     pass_through_opts =
-      Keyword.drop(opts, [:target, :width, :height, :mod, :transport, :name, :writer])
+      Keyword.drop(opts, [
+        :target,
+        :width,
+        :height,
+        :mod,
+        :transport,
+        :name,
+        :writer,
+        :intent_writer
+      ])
 
     cell_session = CellSession.new(width, height)
     writer_fn = Keyword.get(opts, :writer) || build_writer(target)
+    intent_writer_fn = Keyword.get(opts, :intent_writer) || build_intent_writer(target)
 
     server_opts =
       [
         mod: mod,
         name: nil,
-        transport: {:cell_session, cell_session, writer_fn}
+        transport: {:cell_session, cell_session, writer_fn, intent_writer_fn}
       ] ++ pass_through_opts
 
     Telemetry.span(
@@ -228,9 +239,31 @@ defmodule PhoenixExRatatui.Transport do
   # it verbatim to the LiveView; encoding to JSON for `push_event/3`
   # happens in the LiveView itself (PhoenixExRatatui.Renderer.Html in
   # a follow-up chunk), so the wire payload here stays a struct.
+  defp validate_required!(target, width, height) do
+    if is_pid(target) and is_integer(width) and width > 0 and is_integer(height) and height > 0 do
+      :ok
+    else
+      raise ArgumentError,
+            "expected :target as pid and :width / :height as positive integers, got: " <>
+              inspect(target: target, width: width, height: height)
+    end
+  end
+
   defp build_writer(target_pid) when is_pid(target_pid) do
     fn %Diff{} = diff ->
       send(target_pid, {:phoenix_ex_ratatui, :render, diff})
+      :ok
+    end
+  end
+
+  # Default intent_writer_fn for the LiveView path. The macro's
+  # handle_info clause matches on `{:phoenix_ex_ratatui, :intent, _}`
+  # and dispatches to push_navigate/push_patch/redirect.
+  # `PhoenixExRatatui.LiveComponent` swaps in a `send_update`-based
+  # writer because LCs have no handle_info.
+  defp build_intent_writer(target_pid) when is_pid(target_pid) do
+    fn intent ->
+      send(target_pid, {:phoenix_ex_ratatui, :intent, intent})
       :ok
     end
   end

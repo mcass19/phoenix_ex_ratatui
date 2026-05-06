@@ -24,5 +24,24 @@ defmodule PhoenixExRatatui.TestLive do
   end
 
   def tui_handle_event(%Key{code: "q"}, state), do: {:stop, state}
+
+  # Hooks used by intent-dispatch tests. Each key emits a different
+  # intent shape so the LV's handle_info path can be exercised without
+  # spinning up a separate fixture for every case.
+  def tui_handle_event(%Key{code: "navigate"}, state),
+    do: {:noreply, state, intents: [{:navigate, "/elsewhere"}]}
+
+  def tui_handle_event(%Key{code: "patch"}, state),
+    do: {:noreply, state, intents: [{:patch, "/elsewhere"}]}
+
+  def tui_handle_event(%Key{code: "redirect"}, state),
+    do: {:noreply, state, intents: [{:redirect, "/login"}]}
+
+  def tui_handle_event(%Key{code: "external"}, state),
+    do: {:noreply, state, intents: [{:redirect, [external: "https://example.com"]}]}
+
+  def tui_handle_event(%Key{code: "unknown_intent"}, state),
+    do: {:noreply, state, intents: [{:teleport, "/nowhere"}]}
+
   def tui_handle_event(_event, state), do: {:noreply, %{state | n: state.n + 1}}
 end

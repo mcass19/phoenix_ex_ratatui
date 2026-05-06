@@ -11,6 +11,14 @@ defmodule DemoWeb.AdminLive do
     {:ok, assign(socket, page_title: "Admin Dashboard")}
   end
 
+  # Forwarding clause documented in `PhoenixExRatatui.LiveComponent`'s
+  # moduledoc — required because the embedded TUI emits a navigation
+  # intent on `b` and the parent here is a plain `Phoenix.LiveView`.
+  @impl true
+  def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+    {:noreply, PhoenixExRatatui.LiveView.dispatch_intent(socket, intent)}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -21,8 +29,9 @@ defmodule DemoWeb.AdminLive do
         The widget below is a unified-module
         <code>PhoenixExRatatui.LiveComponent</code> running inside this
         regular Phoenix-rendered page. Resize the window or focus the
-        TUI and press <kbd>+</kbd> / <kbd>-</kbd> — frames flow over the
-        LiveView socket as cell deltas.
+        TUI and press <kbd>+</kbd> / <kbd>-</kbd>. Press <kbd>b</kbd>
+        to navigate back to <a href="/login">/login</a> via a runtime
+        intent — frames flow over the LiveView socket as cell deltas.
       </p>
 
       <section style="margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px;">

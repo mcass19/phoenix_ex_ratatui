@@ -217,6 +217,69 @@ into the component's `update/2` (LiveComponents have no `handle_info`
 — they share the parent LV's process). Everything else is identical
 to the full-page path.
 
+## Inter-page navigation
+
+A TUI can request navigation to another LV route by returning a list of
+runtime intents from any handler. The intents flow through
+`ExRatatui.Server`'s intent writer into the LV, which dispatches them
+to `Phoenix.LiveView.push_navigate/2` (and its siblings):
+
+```elixir
+defmodule MyAppWeb.LoginTui do
+  use PhoenixExRatatui.LiveView
+
+  alias ExRatatui.Event.Key
+
+  def tui_mount(_opts), do: {:ok, %{}}
+
+  def tui_render(_state, _frame), do: # …
+
+  # Press <enter> → push_navigate to /dashboard
+  def tui_handle_event(%Key{code: "enter"}, state) do
+    {:noreply, state, intents: [{:navigate, "/dashboard"}]}
+  end
+
+  def tui_handle_event(_, state), do: {:noreply, state}
+end
+```
+
+Recognised intent shapes:
+
+| Intent | Effect |
+|---|---|
+| `{:navigate, "/path"}` | `Phoenix.LiveView.push_navigate(socket, to: path)` |
+| `{:patch, "/path"}` | `Phoenix.LiveView.push_patch(socket, to: path)` |
+| `{:redirect, "/path"}` | `Phoenix.LiveView.redirect(socket, to: path)` |
+| `{:redirect, [external: "https://…"]}` | external redirect |
+
+Unrecognised intents are dropped (logged at warning level), so a TUI
+that returns an intent the host doesn't know how to handle stays
+alive instead of crashing.
+
+### Embedded LiveComponent navigation
+
+Phoenix LV forbids redirects from inside `LiveComponent.update/2`,
+so when the embedded TUI emits a navigation intent the LiveComponent
+sends it to its parent LV process via `send/2` and the parent
+dispatches. Add this clause to the parent LV:
+
+```elixir
+def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+  {:noreply, PhoenixExRatatui.LiveView.dispatch_intent(socket, intent)}
+end
+```
+
+If the parent is itself a `PhoenixExRatatui.LiveView`, the clause is
+generated for you and you don't need to do anything.
+
+### Stop-then-redirect
+
+Intents from `{:stop, state, intents: ...}` transitions fire **before**
+the runtime server exits, so a TUI can return
+`{:stop, state, intents: [{:redirect, "/login"}]}` from a "logout" key
+and trust the redirect reaches the LV before the server's EXIT signal
+propagates.
+
 ## Decision matrix
 
 | Use | When |

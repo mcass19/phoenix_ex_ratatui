@@ -13,13 +13,14 @@ defmodule DemoWeb.Router do
   scope "/", DemoWeb do
     pipe_through(:browser)
 
-    # Redirect root to /counter so opening localhost:4000 lands on
-    # something visible.
+    # Redirect root to /login so opening localhost:4000 lands on the
+    # demo's entry TUI.
     get("/", PageController, :home)
 
-    # 1. Unified-module full-page TUI. `DemoWeb.CounterLive` is both
-    #    a `Phoenix.LiveView` and the `ExRatatui.App` driving it —
-    #    mounted via Phoenix's regular `live/3`.
+    # 1. Multi-route nav demo. /login → /counter or /admin via
+    #    runtime intents (`{:navigate, "/path"}`). Same intent
+    #    machinery powers /counter's `q → /login` "logout".
+    live("/login", LoginLive)
     live("/counter", CounterLive)
 
     # 2. Unified-module LiveComponent embedded inside a regular

@@ -67,6 +67,39 @@ end
 
 Both drive the same `PhoenixExRatatui.Transport` underneath — a `CellSession` + `ExRatatui.Server` pair that ships rendered cell diffs to the browser as `phx_ex_ratatui:render` events.
 
+## Inter-page navigation via runtime intents
+
+A TUI can navigate to another route by emitting a runtime intent from any handler:
+
+```elixir
+def tui_handle_event(%Key{code: "enter"}, state) do
+  {:noreply, state, intents: [{:navigate, "/dashboard"}]}
+end
+
+def tui_handle_event(%Key{code: "q"}, state) do
+  {:noreply, state, intents: [{:redirect, "/login"}]}
+end
+```
+
+Recognised intent shapes:
+
+| Intent | Effect |
+|---|---|
+| `{:navigate, "/path"}` | `Phoenix.LiveView.push_navigate/2` |
+| `{:patch, "/path"}` | `Phoenix.LiveView.push_patch/2` |
+| `{:redirect, "/path"}` | `Phoenix.LiveView.redirect/2` (internal) |
+| `{:redirect, [external: "https://…"]}` | `redirect/2` to an external URL |
+
+Unrecognised intents are dropped (logged at warning) so a TUI stays portable across consumers — return whatever your runtime understands and the LV ignores the rest.
+
+For the embeddable `LiveComponent`, intents bubble up to the parent LV via `send/2` (Phoenix LV forbids redirects from inside `LiveComponent.update/2`). Add this clause to your parent LV:
+
+```elixir
+def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+  {:noreply, PhoenixExRatatui.LiveView.dispatch_intent(socket, intent)}
+end
+```
+
 ## Threading socket data into the App
 
 LiveView assigns and TUI state live in different processes. The `tui_mount_opts/1` callback is the bridge — it receives the LiveView socket and returns the keyword list passed as `opts` to `tui_mount/1`:

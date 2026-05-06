@@ -24,4 +24,12 @@ defmodule PhoenixExRatatui.TestParentLive do
     <.live_component module={@component} id="embedded-tui" />
     """
   end
+
+  # Forwarding clause documented in `PhoenixExRatatui.LiveComponent`'s
+  # moduledoc — required when the embedded TUI emits navigation intents
+  # and the parent is a plain `Phoenix.LiveView`.
+  @impl true
+  def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+    {:noreply, PhoenixExRatatui.LiveView.dispatch_intent(socket, intent)}
+  end
 end

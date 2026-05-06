@@ -21,6 +21,7 @@ defmodule DemoWeb.CounterPanel do
 
        +    increment
        -    decrement
+       b    back to /login
     """
 
     paragraph = %Paragraph{
@@ -39,5 +40,9 @@ defmodule DemoWeb.CounterPanel do
 
   def tui_handle_event(%Key{code: "+"}, state), do: {:noreply, %{state | n: state.n + 1}}
   def tui_handle_event(%Key{code: "-"}, state), do: {:noreply, %{state | n: state.n - 1}}
+
+  def tui_handle_event(%Key{code: "b"}, state),
+    do: {:noreply, state, intents: [{:navigate, "/login"}]}
+
   def tui_handle_event(_event, state), do: {:noreply, state}
 end

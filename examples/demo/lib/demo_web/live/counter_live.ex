@@ -20,7 +20,7 @@ defmodule DemoWeb.CounterLive do
 
        +    increment
        -    decrement
-       q    quit
+       q    back to /login
     """
 
     paragraph = %Paragraph{
@@ -39,6 +39,9 @@ defmodule DemoWeb.CounterLive do
 
   def tui_handle_event(%Key{code: "+"}, state), do: {:noreply, %{state | n: state.n + 1}}
   def tui_handle_event(%Key{code: "-"}, state), do: {:noreply, %{state | n: state.n - 1}}
-  def tui_handle_event(%Key{code: "q"}, state), do: {:stop, state}
+
+  def tui_handle_event(%Key{code: "q"}, state),
+    do: {:noreply, state, intents: [{:navigate, "/login"}]}
+
   def tui_handle_event(_event, state), do: {:noreply, state}
 end

@@ -84,6 +84,31 @@ defmodule PhoenixExRatatui.LiveComponent do
   This sets it on the parent LV process; if your LV traps exits for
   other reasons, the flag is shared.
 
+  ## Intents and the parent LV
+
+  When the embedded TUI emits intents (e.g. returning `{:noreply, state,
+  intents: [{:navigate, "/login"}]}` from `tui_handle_event/2`), the
+  intent must dispatch from the **parent LV's process**, not the
+  LiveComponent — Phoenix LV forbids redirects from inside
+  `LiveComponent.update/2`.
+
+  This module's intent_writer therefore sends a regular message to
+  the parent LV: `send(parent_pid, {:phoenix_ex_ratatui, :intent,
+  intent})`. The parent LV must have a `handle_info/2` clause that
+  picks it up:
+
+      def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
+        {:noreply, PhoenixExRatatui.LiveView.dispatch_intent(socket, intent)}
+      end
+
+  `PhoenixExRatatui.LiveView.dispatch_intent/2` handles the standard
+  intent shapes (`{:navigate, _}`, `{:patch, _}`, `{:redirect, _}`).
+
+  If you embed the LC inside another `PhoenixExRatatui.LiveView`
+  (rare but supported), this clause is generated for you and you don't
+  have to do anything. For the common case — embedding inside a plain
+  `Phoenix.LiveView` — copy the snippet above.
+
   ## Telemetry
 
   Same events as `PhoenixExRatatui.LiveView` — see
@@ -91,6 +116,9 @@ defmodule PhoenixExRatatui.LiveComponent do
   """
 
   alias PhoenixExRatatui.LiveView, as: PXRLV
+  alias PhoenixExRatatui.Renderer.Html
+  alias PhoenixExRatatui.Telemetry
+  alias PhoenixExRatatui.Transport
 
   @doc """
   Generates the unified LiveComponent + App module. See the moduledoc.
@@ -148,9 +176,15 @@ defmodule PhoenixExRatatui.LiveComponent do
       @impl Phoenix.LiveComponent
       # `tui_diff` is sent by the writer (built in `__start_transport__/3`)
       # via `Phoenix.LiveView.send_update/3` whenever the runtime
-      # produces a frame. We encode and push immediately, then return
-      # the socket WITHOUT merging :tui_diff into assigns — it's a
+      # produces a frame. We handle it immediately and return the
+      # socket WITHOUT merging :tui_diff into assigns — it's a
       # one-shot value, not state.
+      #
+      # Intents (`tui_intent`) intentionally do NOT route through
+      # `send_update`: Phoenix LV forbids redirects from inside
+      # `update/2`. Instead the intent_writer in `__start_transport__/3`
+      # uses `send(parent_pid, ...)` and the parent LV handles the
+      # message in its own `handle_info/2`. See the moduledoc.
       def update(%{tui_diff: diff}, socket) do
         {:ok, PhoenixExRatatui.LiveComponent.__push_render__(socket, diff)}
       end
@@ -209,12 +243,8 @@ defmodule PhoenixExRatatui.LiveComponent do
       ops_count: length(diff.ops)
     }
 
-    PhoenixExRatatui.Telemetry.span([:render, :frame], meta, fn ->
-      Phoenix.LiveView.push_event(
-        socket,
-        "phx_ex_ratatui:render",
-        PhoenixExRatatui.Renderer.Html.encode_diff(diff)
-      )
+    Telemetry.span([:render, :frame], meta, fn ->
+      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
     end)
   end
 
@@ -247,16 +277,30 @@ defmodule PhoenixExRatatui.LiveComponent do
       :ok
     end
 
+    # Intents must dispatch from the parent LV process (Phoenix LV
+    # forbids redirects from `LiveComponent.update/2`). The writer
+    # therefore sends a regular `{:phoenix_ex_ratatui, :intent, _}`
+    # message to the parent pid; the parent LV's `handle_info/2`
+    # picks it up. If the parent is a `PhoenixExRatatui.LiveView`,
+    # the generated `handle_info` clause already does this. If the
+    # parent is a plain `Phoenix.LiveView`, the user must add the
+    # forwarding clause themselves — see this module's moduledoc.
+    intent_writer = fn intent ->
+      send(parent_pid, {:phoenix_ex_ratatui, :intent, intent})
+      :ok
+    end
+
     start_link_opts =
       [
         mod: runtime_mod,
         width: cols,
         height: rows,
         target: parent_pid,
-        writer: writer
+        writer: writer,
+        intent_writer: intent_writer
       ] ++ mount_opts
 
-    case PhoenixExRatatui.Transport.start_link(start_link_opts) do
+    case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
         Phoenix.Component.assign(socket, :tui, refs)
 
@@ -266,7 +310,7 @@ defmodule PhoenixExRatatui.LiveComponent do
   end
 
   defp __resize_transport__(socket, refs, cols, rows) do
-    case PhoenixExRatatui.Transport.resize(refs, cols, rows) do
+    case Transport.resize(refs, cols, rows) do
       :ok -> socket
       {:error, _} -> Phoenix.Component.assign(socket, :tui_error, "session closed")
     end
@@ -281,9 +325,9 @@ defmodule PhoenixExRatatui.LiveComponent do
       refs ->
         event = PXRLV.decode_input(payload)
 
-        PhoenixExRatatui.Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
+        Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
 
-        :ok = PhoenixExRatatui.Transport.push_event(refs, event)
+        :ok = Transport.push_event(refs, event)
         socket
     end
   end

@@ -16,5 +16,9 @@ defmodule PhoenixExRatatui.TestComponent do
   end
 
   def tui_handle_event(%Key{code: "q"}, state), do: {:stop, state}
+
+  def tui_handle_event(%Key{code: "navigate"}, state),
+    do: {:noreply, state, intents: [{:navigate, "/elsewhere"}]}
+
   def tui_handle_event(_event, state), do: {:noreply, %{state | n: state.n + 1}}
 end
