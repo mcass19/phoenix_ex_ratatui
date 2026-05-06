@@ -22,14 +22,28 @@ defp deps do
 end
 ```
 
-Wire the JS hook into your `LiveSocket`. The hook lives in this
-package's bundled assets — import the relative path through `deps/`:
+Wire the JS hook. `phoenix_ex_ratatui` ships a top-level
+`package.json`, so you import it like any other npm module. Add it
+to your `assets/package.json`:
+
+```json
+{
+  "dependencies": {
+    "phoenix": "file:../deps/phoenix",
+    "phoenix_html": "file:../deps/phoenix_html",
+    "phoenix_live_view": "file:../deps/phoenix_live_view",
+    "phoenix_ex_ratatui": "file:../deps/phoenix_ex_ratatui"
+  }
+}
+```
+
+Then `cd assets && npm install` to symlink it, and import the hook
+in your `assets/js/app.js`:
 
 ```js
-// assets/js/app.js
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
-import { PhoenixExRatatuiHook } from "../../deps/phoenix_ex_ratatui/lib/assets/phoenix_ex_ratatui/main.js"
+import { PhoenixExRatatuiHook } from "phoenix_ex_ratatui"
 
 const liveSocket = new LiveSocket("/live", Socket, {
   hooks: { PhoenixExRatatuiHook }

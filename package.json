@@ -1,0 +1,11 @@
+{
+  "name": "phoenix_ex_ratatui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "JS hook for the phoenix_ex_ratatui Elixir package — exposes the bundled cell-grid hook so consumers can `import { PhoenixExRatatuiHook } from \"phoenix_ex_ratatui\"`.",
+  "main": "./lib/assets/phoenix_ex_ratatui/main.js",
+  "exports": {
+    ".": "./lib/assets/phoenix_ex_ratatui/main.js"
+  }
+}

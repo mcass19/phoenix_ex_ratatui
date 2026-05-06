@@ -61,13 +61,25 @@ All three drive the same `PhoenixExRatatui.Transport` underneath — a `CellSess
 
 ## Wiring the JS hook
 
-The bundled hook lives at `lib/assets/phoenix_ex_ratatui/main.js`. Wire it into your LiveSocket:
+The hook is resolved as a normal npm module. Add it to your `assets/package.json` alongside Phoenix's own JS deps:
+
+```json
+{
+  "dependencies": {
+    "phoenix": "file:../deps/phoenix",
+    "phoenix_html": "file:../deps/phoenix_html",
+    "phoenix_live_view": "file:../deps/phoenix_live_view",
+    "phoenix_ex_ratatui": "file:../deps/phoenix_ex_ratatui"
+  }
+}
+```
+
+Run `npm install` (or `cd assets && npm install`), then import the hook in your `assets/js/app.js`:
 
 ```js
-// assets/js/app.js
 import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
-import { PhoenixExRatatuiHook } from "../../deps/phoenix_ex_ratatui/lib/assets/phoenix_ex_ratatui/main.js"
+import { PhoenixExRatatuiHook } from "phoenix_ex_ratatui"
 
 const liveSocket = new LiveSocket("/live", Socket, {
   hooks: { PhoenixExRatatuiHook }
