@@ -126,13 +126,14 @@ defmodule PhoenixExRatatui.LiveComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div style="width:100%;height:100%">
       <div
         id={@id}
         phx-hook="PhoenixExRatatuiHook"
         phx-update="ignore"
         phx-target={@myself}
         data-phx-ex-ratatui-app={inspect(@app)}
+        style="width:100%;height:100%"
       >
       </div>
       <%= if @tui_error do %>

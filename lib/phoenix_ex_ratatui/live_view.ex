@@ -166,6 +166,7 @@ defmodule PhoenixExRatatui.LiveView do
           socket
           |> Phoenix.Component.assign(:tui, nil)
           |> Phoenix.Component.assign(:tui_error, nil)
+          |> Phoenix.Component.assign(:tui_ended, false)
           |> Phoenix.Component.assign(:tui_app, @phoenix_ex_ratatui_app)
           |> Phoenix.Component.assign(:tui_container_id, @phoenix_ex_ratatui_container_id)
 
@@ -185,10 +186,16 @@ defmodule PhoenixExRatatui.LiveView do
           phx-hook="PhoenixExRatatuiHook"
           phx-update="ignore"
           data-phx-ex-ratatui-app={inspect(@tui_app)}
+          style="width:100%;height:100vh"
         >
         </div>
         <%= if @tui_error do %>
           <p class="phoenix-ex-ratatui-error">TUI error: {@tui_error}</p>
+        <% end %>
+        <%= if @tui_ended do %>
+          <p class="phoenix-ex-ratatui-ended" style="position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#222;border:1px solid #555;border-radius:4px;">
+            TUI session ended. <a href="" style="color:#729fcf;">Refresh</a> to restart.
+          </p>
         <% end %>
         """
       end
@@ -211,6 +218,16 @@ defmodule PhoenixExRatatui.LiveView do
       def handle_info({:phoenix_ex_ratatui, :render, diff}, socket) do
         {:noreply,
          PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_app, diff)}
+      end
+
+      # The runtime server is linked to this LV (via Transport.start_link).
+      # When the App returns `{:stop, _}`, the server exits cleanly and
+      # we get an EXIT signal. Without this clause the painted cells
+      # stay on screen but no events flow — a confusing "frozen TUI"
+      # state. We catch the EXIT, null out the refs, and flip
+      # `:tui_ended` so render/1 shows a refresh prompt.
+      def handle_info({:EXIT, server_pid, _reason}, socket) do
+        {:noreply, PhoenixExRatatui.LiveView.__handle_server_exit__(socket, server_pid)}
       end
 
       defoverridable mount: 3, render: 1, handle_event: 3, handle_info: 2
@@ -247,6 +264,23 @@ defmodule PhoenixExRatatui.LiveView do
     case Transport.resize(refs, cols, rows) do
       :ok -> socket
       {:error, _} -> Phoenix.Component.assign(socket, :tui_error, "session closed")
+    end
+  end
+
+  @doc false
+  # Detect when the linked runtime server has exited and surface the
+  # "TUI session ended" state to the user. We match on the server pid
+  # via the assigns to ignore EXIT signals from any unrelated linked
+  # process (e.g. a user-opened Task in their own mount/3 override).
+  def __handle_server_exit__(socket, server_pid) do
+    case socket.assigns[:tui] do
+      %{server: ^server_pid} ->
+        socket
+        |> Phoenix.Component.assign(:tui, nil)
+        |> Phoenix.Component.assign(:tui_ended, true)
+
+      _ ->
+        socket
     end
   end
 

@@ -84,6 +84,72 @@ defmodule PhoenixExRatatui.LiveViewTest do
     end
   end
 
+  describe "__handle_server_exit__/2 (compile-time helper)" do
+    # Direct unit tests for the EXIT handler. The integration test
+    # below ("App returning :stop ends the session...") covers the
+    # matching path end-to-end via the macro; this block locks the
+    # fall-through behaviour where an EXIT arrives from a process
+    # that ISN'T our runtime server (e.g. a user-spawned Task that
+    # crashed in their own mount/3 override).
+    alias Phoenix.LiveView.Socket
+
+    test "matching server pid clears :tui and flips :tui_ended" do
+      fake_server = self()
+
+      socket = %Socket{
+        endpoint: PhoenixExRatatui.TestEndpoint,
+        assigns: %{
+          __changed__: %{},
+          tui: %{server: fake_server, cell_session: :ref, mod: PhoenixExRatatui.TestApp},
+          tui_ended: false
+        }
+      }
+
+      result = PXRLV.__handle_server_exit__(socket, fake_server)
+
+      assert result.assigns.tui == nil
+      assert result.assigns.tui_ended == true
+    end
+
+    test "non-matching pid leaves the socket unchanged" do
+      our_server = self()
+      stranger = spawn(fn -> :ok end)
+
+      socket = %Socket{
+        endpoint: PhoenixExRatatui.TestEndpoint,
+        assigns: %{
+          __changed__: %{},
+          tui: %{server: our_server, cell_session: :ref, mod: PhoenixExRatatui.TestApp},
+          tui_ended: false
+        }
+      }
+
+      result = PXRLV.__handle_server_exit__(socket, stranger)
+
+      # The user might have spawned their own Task that exited; we
+      # ignore those signals instead of clobbering the live TUI's
+      # state.
+      assert result.assigns.tui != nil
+      assert result.assigns.tui_ended == false
+    end
+
+    test "EXIT arriving while :tui is already nil is a no-op" do
+      # If the runtime had already been torn down by the time the
+      # EXIT message reaches the LV (e.g. handler order during a
+      # disconnect), don't accidentally re-flip the ended state on
+      # top of an already-cleared assigns.
+      socket = %Socket{
+        endpoint: PhoenixExRatatui.TestEndpoint,
+        assigns: %{__changed__: %{}, tui: nil, tui_ended: false}
+      }
+
+      result = PXRLV.__handle_server_exit__(socket, self())
+
+      assert result.assigns.tui == nil
+      assert result.assigns.tui_ended == false
+    end
+  end
+
   describe "decode_input/1 (public helper)" do
     # The decoder is exposed for users hand-rolling their own LiveView
     # without the macro, so it gets its own focused tests beyond the
@@ -246,6 +312,41 @@ defmodule PhoenixExRatatui.LiveViewTest do
       refute_push_event_arrives(view, "phx_ex_ratatui:render", 100)
     end
 
+    @tag capture_log: true
+    test "App returning :stop ends the session and renders the refresh prompt" do
+      # When the user's TUI App returns `{:stop, _}` from
+      # handle_event/2, the runtime server exits cleanly. The macro's
+      # generated `handle_info({:EXIT, _, _}, ...)` clause catches the
+      # linked-server EXIT, nulls the `:tui` assign, and flips
+      # `:tui_ended` so render/1 paints a "session ended — refresh"
+      # prompt. Without this, the painted cells would stay visible
+      # but no events would flow — a confusing frozen-TUI state.
+      {:ok, view, _html} = live_isolated(build_conn(), TestLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{"cols" => 8, "rows" => 1})
+      assert_push_event(view, "phx_ex_ratatui:render", _, 1000)
+
+      # `q` is the TestApp's :stop trigger. Send it through the hook.
+      render_hook(view, "phx_ex_ratatui:input", %{
+        "kind" => "key",
+        "code" => "q",
+        "modifiers" => []
+      })
+
+      # The Server's exit + EXIT message + LV handle_info dance is
+      # asynchronous. Poll the socket assigns until we see the
+      # ended state — `:sys.get_state` is a synchronous probe so
+      # any pending messages in the LV's mailbox have been
+      # processed by the time it returns.
+      assert_assigns_eventually(view, fn assigns ->
+        assigns.tui == nil and assigns.tui_ended == true
+      end)
+
+      html = render(view)
+      assert html =~ "TUI session ended"
+      assert html =~ "Refresh"
+    end
+
     test "input after resize forwards to the Transport and triggers a re-render" do
       {:ok, view, _html} = live_isolated(build_conn(), TestLive)
 
@@ -276,6 +377,30 @@ defmodule PhoenixExRatatui.LiveViewTest do
   # ----------------------------------------------------------------------
   # Helpers
   # ----------------------------------------------------------------------
+
+  # Polls the LV's socket assigns until a predicate holds or the
+  # timeout expires. Used by the App-:stop test where the EXIT-handle
+  # path is asynchronous and `render_hook` returns before the LV has
+  # processed the resulting message.
+  defp assert_assigns_eventually(view, predicate, timeout_ms \\ 1000) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_assert_assigns_eventually(view, predicate, deadline)
+  end
+
+  defp do_assert_assigns_eventually(view, predicate, deadline) do
+    if predicate.(:sys.get_state(view.pid).socket.assigns) do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) > deadline do
+        flunk(
+          "assigns never matched predicate: #{inspect(:sys.get_state(view.pid).socket.assigns)}"
+        )
+      else
+        Process.sleep(20)
+        do_assert_assigns_eventually(view, predicate, deadline)
+      end
+    end
+  end
 
   # Phoenix.LiveViewTest doesn't ship a refute_push_event/3 macro the
   # way it ships assert_push_event/3, but the same idea is easy to
