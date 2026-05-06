@@ -9,12 +9,26 @@ defmodule PhoenixExRatatui.Router do
         use Phoenix.Router
         import PhoenixExRatatui.Router
 
-        scope "/", MyAppWeb do
+        scope "/" do
           pipe_through :browser
 
           tui_live "/tui", MyApp.Tui
         end
       end
+
+  > #### Use non-aliased scopes for `tui_live` {: .warning}
+  >
+  > `tui_live` generates a wrapper module at compile time using the
+  > calling router's namespace. If you put `tui_live` inside an
+  > aliased scope (`scope "/", MyAppWeb do ...`), Phoenix's
+  > scope-alias prepending double-prefixes the wrapper name, turning
+  > `MyAppWeb.Router.TuiLive_<hash>` into
+  > `MyAppWeb.MyAppWeb.Router.TuiLive_<hash>` — and you get a
+  > "module not available" warning at compile time plus a 500 at
+  > runtime. Wrap your `tui_live` calls in a `scope "/"` with no
+  > alias prefix; the regular `live` routes inside the same scope
+  > can still take fully-qualified module names like
+  > `live "/admin", MyAppWeb.AdminLive`.
 
   Equivalent two-step pattern without `tui_live`:
 

@@ -1,0 +1,9 @@
+/_build/
+/cover/
+/deps/
+/doc/
+/priv/static/assets/
+/assets/node_modules/
+erl_crash.dump
+*.ez
+demo-*.tar

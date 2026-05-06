@@ -135,6 +135,7 @@ defmodule PhoenixExRatatui.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md": [title: "Overview"],
+        "guides/getting_started.md": [title: "Getting Started"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "CHANGELOG.md": [title: "Changelog"]
       ],
