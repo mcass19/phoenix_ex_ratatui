@@ -13,19 +13,17 @@ defmodule DemoWeb.Router do
   scope "/", DemoWeb do
     pipe_through(:browser)
 
-    # Redirect root to /login so opening localhost:4000 lands on the
-    # demo's entry TUI.
-    get("/", PageController, :home)
-
-    # 1. Multi-route nav demo. /login → /counter or /admin via
-    #    runtime intents (`{:navigate, "/path"}`). Same intent
-    #    machinery powers /counter's `q → /login` "logout".
-    live("/login", LoginLive)
-    live("/counter", CounterLive)
-
-    # 2. Unified-module LiveComponent embedded inside a regular
-    #    LiveView. The TUI lives alongside non-TUI content the
-    #    parent LV controls.
+    # Three views — three different integration shapes:
+    #
+    # /        landing TUI (full-page LV, callbacks runtime)
+    # /chat    rich-widget chat (full-page LV, callbacks runtime)
+    # /admin   plain LV embedding a reducer-runtime LiveComponent
+    #
+    # All inter-page navigation flows through `phoenix_ex_ratatui`'s
+    # runtime intents (`{:navigate, "/path"}` etc.), dispatched by
+    # the LV macro into `Phoenix.LiveView.push_navigate/2` and friends.
+    live("/", HomeLive)
+    live("/chat", ChatLive)
     live("/admin", AdminLive)
   end
 end

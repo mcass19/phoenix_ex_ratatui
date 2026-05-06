@@ -129,38 +129,24 @@ defmodule PhoenixExRatatui.LiveComponent do
 
   @doc false
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  def __build_using_quote__(_opts) do
+  def __build_using_quote__(opts) do
+    runtime = Keyword.get(opts, :runtime, :callbacks)
+
+    unless runtime in [:callbacks, :reducer] do
+      raise ArgumentError,
+            "PhoenixExRatatui.LiveComponent :runtime must be :callbacks or :reducer, got: #{inspect(runtime)}"
+    end
+
+    tui_defaults = PhoenixExRatatui.LiveView.tui_defaults_quote(runtime)
+
     quote location: :keep do
       use Phoenix.LiveComponent
 
       @phoenix_ex_ratatui_runtime_mod Module.concat(__MODULE__, "Runtime")
+      @phoenix_ex_ratatui_runtime unquote(runtime)
 
       # ----- TUI callback defaults (all overridable) -----
-
-      @doc false
-      def tui_mount(_opts), do: {:ok, %{}}
-
-      @doc false
-      def tui_render(_state, _frame), do: []
-
-      @doc false
-      def tui_handle_event(_event, state), do: {:noreply, state}
-
-      @doc false
-      def tui_handle_info(_msg, state), do: {:noreply, state}
-
-      @doc false
-      def tui_terminate(_reason, _state), do: :ok
-
-      @doc false
-      def tui_mount_opts(_socket), do: []
-
-      defoverridable tui_mount: 1,
-                     tui_render: 2,
-                     tui_handle_event: 2,
-                     tui_handle_info: 2,
-                     tui_terminate: 2,
-                     tui_mount_opts: 1
+      unquote(tui_defaults)
 
       # ----- Phoenix.LiveComponent callbacks -----
 

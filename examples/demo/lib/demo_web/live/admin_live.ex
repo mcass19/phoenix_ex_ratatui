@@ -1,8 +1,9 @@
 defmodule DemoWeb.AdminLive do
   @moduledoc """
-  Demonstrates `PhoenixExRatatui.LiveComponent` embedded alongside
-  regular Phoenix-native content. The TUI is just one of several
-  pieces of UI on the page.
+  Plain `Phoenix.LiveView` hosting the reducer-runtime
+  `DemoWeb.SystemMonitorPanel` LiveComponent alongside regular
+  Phoenix-native page chrome. The TUI is one of several pieces of
+  UI on the page.
   """
   use DemoWeb, :live_view
 
@@ -22,34 +23,40 @@ defmodule DemoWeb.AdminLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <main style="font-family: system-ui, sans-serif; max-width: 80ch; margin: 2rem auto; padding: 0 1rem;">
+    <main style="font-family: system-ui, sans-serif; max-width: 90ch; margin: 2rem auto; padding: 0 1rem;">
       <h1>Admin Dashboard</h1>
 
       <p>
-        The widget below is a unified-module
-        <code>PhoenixExRatatui.LiveComponent</code> running inside this
-        regular Phoenix-rendered page. Resize the window or focus the
-        TUI and press <kbd>+</kbd> / <kbd>-</kbd>. Press <kbd>b</kbd>
-        to navigate back to <a href="/login">/login</a> via a runtime
-        intent — frames flow over the LiveView socket as cell deltas.
+        The panel below is a <strong>reducer-runtime</strong>
+        <code>PhoenixExRatatui.LiveComponent</code> embedded inside
+        this regular Phoenix LiveView page. Click the TUI to focus it
+        and press <kbd>r</kbd> to refresh, or <kbd>b</kbd> to navigate
+        back to <a href="/">home</a> via a runtime intent.
       </p>
 
-      <section style="margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px;">
-        <h2 style="margin-top: 0;">Live counter (TUI)</h2>
+      <p style="color: #555;">
+        The dashboard ticks every two seconds via
+        <code>ExRatatui.Subscription.interval/3</code> declared in
+        <code>tui_subscriptions/1</code> — no <code>Process.send_after</code>,
+        no manual reschedule.
+      </p>
+
+      <section style="margin: 1.5rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;">
+        <h2 style="margin-top: 0;">System Monitor (TUI)</h2>
         <!-- The LiveComponent fills its parent (width: 100%; height: 100%).
              We give the wrapping div an explicit height so there's room
-             to render. Without this, the hook would fall back to its
-             default 80x24 cells and overflow the section. -->
-        <div style="height: 22em;">
-          <.live_component module={DemoWeb.CounterPanel} id="admin-counter" />
+             for the dashboard. Without this, the hook would fall back to
+             its default 80x24 cells and overflow the section. -->
+        <div style="height: 32em; border-radius: 4px; overflow: hidden;">
+          <.live_component module={DemoWeb.SystemMonitorPanel} id="admin-monitor" />
         </div>
       </section>
 
       <p>
-        For the same TUI logic as a full-page route — no surrounding
-        chrome, no container — see <a href="/counter">/counter</a>,
-        which mounts <code>DemoWeb.CounterLive</code> directly via the
-        router's regular <code>live/3</code> macro.
+        Source: <code>examples/demo/lib/demo_web/live/system_monitor_panel.ex</code>
+        — a port of <code>ex_ratatui</code>'s
+        <code>system_monitor.exs</code> example, restructured to use
+        the reducer runtime.
       </p>
     </main>
     """

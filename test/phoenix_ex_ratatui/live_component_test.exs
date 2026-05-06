@@ -31,6 +31,12 @@ defmodule PhoenixExRatatui.LiveComponentTest do
       assert elem(ast, 0) == :__block__
     end
 
+    test "rejects unknown :runtime values" do
+      assert_raise ArgumentError, ~r":runtime must be :callbacks or :reducer", fn ->
+        PXRLC.__build_using_quote__(runtime: :nonsense)
+      end
+    end
+
     test "__using__ macro body is invoked when expanded at runtime" do
       module_name = String.to_atom("Elixir.PhoenixExRatatui.LiveComponentTest.RuntimeMacroTest")
 

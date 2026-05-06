@@ -143,6 +143,16 @@ export const PhoenixExRatatuiHook = {
     if (!this.el.style.lineHeight) this.el.style.lineHeight = "1";
     if (!this.el.style.overflow) this.el.style.overflow = "hidden";
 
+    // Full-page LV TUIs auto-focus on mount so users don't have to
+    // click the cell grid before keystrokes flow. The macro sets
+    // `data-phx-ex-ratatui-autofocus="true"` on the container.
+    // LiveComponents intentionally don't auto-focus — they're
+    // embedded alongside other page content the user already
+    // interacts with.
+    if (this.el.dataset.phxExRatatuiAutofocus === "true") {
+      this.el.focus({ preventScroll: true });
+    }
+
     this.measureChar();
     this.reportSize();
 

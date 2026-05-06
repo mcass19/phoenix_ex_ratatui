@@ -29,6 +29,8 @@ defmodule PhoenixExRatatui.MixProject do
           PhoenixExRatatui.FailingMountApp,
           PhoenixExRatatui.TestLive,
           PhoenixExRatatui.TestLive.Runtime,
+          PhoenixExRatatui.ReducerTestLive,
+          PhoenixExRatatui.ReducerTestLive.Runtime,
           PhoenixExRatatui.FailingTestLive,
           PhoenixExRatatui.FailingTestLive.Runtime,
           PhoenixExRatatui.TestComponent,

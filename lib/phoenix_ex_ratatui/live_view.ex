@@ -111,6 +111,14 @@ defmodule PhoenixExRatatui.LiveView do
       `"phoenix-ex-ratatui"`. Override when embedding multiple TUI
       pages on the same router so the JS hook's `getElementById`
       queries don't collide.
+    * `:runtime` — `:callbacks` (default) or `:reducer`. Selects the
+      `ExRatatui.App` runtime style used by the generated proxy.
+      Reducer-runtime modules implement `tui_init/1`, `tui_render/2`,
+      `tui_update/2` (with `{:event, _}` / `{:info, _}` wrapped
+      messages), and optionally `tui_subscriptions/1`, instead of the
+      callbacks-runtime `tui_mount/1` / `tui_handle_event/2` /
+      `tui_handle_info/2` quartet. See
+      [ExRatatui.App](`ExRatatui.App`) for the runtime distinction.
 
   ## Customising LiveView callbacks
 
@@ -168,39 +176,24 @@ defmodule PhoenixExRatatui.LiveView do
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def __build_using_quote__(opts) do
     container_id = Keyword.get(opts, :container_id, "phoenix-ex-ratatui")
+    runtime = Keyword.get(opts, :runtime, :callbacks)
+
+    unless runtime in [:callbacks, :reducer] do
+      raise ArgumentError,
+            "PhoenixExRatatui.LiveView :runtime must be :callbacks or :reducer, got: #{inspect(runtime)}"
+    end
+
+    tui_defaults = tui_defaults_quote(runtime)
 
     quote location: :keep do
       use Phoenix.LiveView
 
       @phoenix_ex_ratatui_container_id unquote(container_id)
       @phoenix_ex_ratatui_runtime_mod Module.concat(__MODULE__, "Runtime")
+      @phoenix_ex_ratatui_runtime unquote(runtime)
 
       # ----- TUI callback defaults (all overridable) -----
-
-      @doc false
-      def tui_mount(_opts), do: {:ok, %{}}
-
-      @doc false
-      def tui_render(_state, _frame), do: []
-
-      @doc false
-      def tui_handle_event(_event, state), do: {:noreply, state}
-
-      @doc false
-      def tui_handle_info(_msg, state), do: {:noreply, state}
-
-      @doc false
-      def tui_terminate(_reason, _state), do: :ok
-
-      @doc false
-      def tui_mount_opts(_socket), do: []
-
-      defoverridable tui_mount: 1,
-                     tui_render: 2,
-                     tui_handle_event: 2,
-                     tui_handle_info: 2,
-                     tui_terminate: 2,
-                     tui_mount_opts: 1
+      unquote(tui_defaults)
 
       # ----- Phoenix.LiveView callbacks -----
 
@@ -231,6 +224,7 @@ defmodule PhoenixExRatatui.LiveView do
           phx-hook="PhoenixExRatatuiHook"
           phx-update="ignore"
           data-phx-ex-ratatui-runtime={inspect(@tui_runtime_mod)}
+          data-phx-ex-ratatui-autofocus="true"
           style="width:100%;height:100vh"
         >
         </div>
@@ -283,6 +277,69 @@ defmodule PhoenixExRatatui.LiveView do
   end
 
   @doc false
+  # Quoted block injected for `tui_*` callback defaults. The shape
+  # depends on the runtime style — callbacks-runtime uses
+  # mount/handle_event/handle_info, reducer-runtime uses
+  # init/update/subscriptions wrapping `{:event, _}` / `{:info, _}`.
+  def tui_defaults_quote(:callbacks) do
+    quote do
+      @doc false
+      def tui_mount(_opts), do: {:ok, %{}}
+
+      @doc false
+      def tui_render(_state, _frame), do: []
+
+      @doc false
+      def tui_handle_event(_event, state), do: {:noreply, state}
+
+      @doc false
+      def tui_handle_info(_msg, state), do: {:noreply, state}
+
+      @doc false
+      def tui_terminate(_reason, _state), do: :ok
+
+      @doc false
+      def tui_mount_opts(_socket), do: []
+
+      defoverridable tui_mount: 1,
+                     tui_render: 2,
+                     tui_handle_event: 2,
+                     tui_handle_info: 2,
+                     tui_terminate: 2,
+                     tui_mount_opts: 1
+    end
+  end
+
+  def tui_defaults_quote(:reducer) do
+    quote do
+      @doc false
+      def tui_init(_opts), do: {:ok, %{}}
+
+      @doc false
+      def tui_render(_state, _frame), do: []
+
+      @doc false
+      def tui_update(_msg, state), do: {:noreply, state}
+
+      @doc false
+      def tui_subscriptions(_state), do: []
+
+      @doc false
+      def tui_terminate(_reason, _state), do: :ok
+
+      @doc false
+      def tui_mount_opts(_socket), do: []
+
+      defoverridable tui_init: 1,
+                     tui_render: 2,
+                     tui_update: 2,
+                     tui_subscriptions: 1,
+                     tui_terminate: 2,
+                     tui_mount_opts: 1
+    end
+  end
+
+  @doc false
   # Compile-time hook called via `@after_compile`. Builds a sibling
   # module (`UserMod.Runtime`) that uses `ExRatatui.App` and delegates
   # every behaviour callback to the user module's `tui_*` functions.
@@ -291,33 +348,59 @@ defmodule PhoenixExRatatui.LiveView do
   # semantics).
   def __define_runtime__(env, _bytecode) do
     user_mod = env.module
+    runtime = Module.get_attribute(user_mod, :phoenix_ex_ratatui_runtime, :callbacks)
     runtime_mod = Module.concat(user_mod, "Runtime")
 
-    body =
-      quote do
-        use ExRatatui.App
-
-        @impl ExRatatui.App
-        def mount(opts), do: unquote(user_mod).tui_mount(opts)
-
-        @impl ExRatatui.App
-        def render(state, frame), do: unquote(user_mod).tui_render(state, frame)
-
-        @impl ExRatatui.App
-        def handle_event(event, state),
-          do: unquote(user_mod).tui_handle_event(event, state)
-
-        @impl ExRatatui.App
-        def handle_info(msg, state),
-          do: unquote(user_mod).tui_handle_info(msg, state)
-
-        @impl ExRatatui.App
-        def terminate(reason, state),
-          do: unquote(user_mod).tui_terminate(reason, state)
-      end
+    body = proxy_body(runtime, user_mod)
 
     Module.create(runtime_mod, body, file: env.file, line: env.line)
     :ok
+  end
+
+  defp proxy_body(:callbacks, user_mod) do
+    quote do
+      use ExRatatui.App
+
+      @impl ExRatatui.App
+      def mount(opts), do: unquote(user_mod).tui_mount(opts)
+
+      @impl ExRatatui.App
+      def render(state, frame), do: unquote(user_mod).tui_render(state, frame)
+
+      @impl ExRatatui.App
+      def handle_event(event, state),
+        do: unquote(user_mod).tui_handle_event(event, state)
+
+      @impl ExRatatui.App
+      def handle_info(msg, state),
+        do: unquote(user_mod).tui_handle_info(msg, state)
+
+      @impl ExRatatui.App
+      def terminate(reason, state),
+        do: unquote(user_mod).tui_terminate(reason, state)
+    end
+  end
+
+  defp proxy_body(:reducer, user_mod) do
+    quote do
+      use ExRatatui.App, runtime: :reducer
+
+      @impl ExRatatui.App
+      def init(opts), do: unquote(user_mod).tui_init(opts)
+
+      @impl ExRatatui.App
+      def render(state, frame), do: unquote(user_mod).tui_render(state, frame)
+
+      @impl ExRatatui.App
+      def update(msg, state), do: unquote(user_mod).tui_update(msg, state)
+
+      @impl ExRatatui.App
+      def subscriptions(state), do: unquote(user_mod).tui_subscriptions(state)
+
+      @impl ExRatatui.App
+      def terminate(reason, state),
+        do: unquote(user_mod).tui_terminate(reason, state)
+    end
   end
 
   @doc false
