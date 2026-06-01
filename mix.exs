@@ -67,11 +67,7 @@ defmodule PhoenixExRatatui.MixProject do
 
   defp deps do
     [
-      # Pinned to a path during pre-release while CellSession (the
-      # primitive this package depends on) lives in ex_ratatui's
-      # `[Unreleased]`. Swap to `{:ex_ratatui, "~> 0.9"}` once
-      # ex_ratatui cuts the release that ships CellSession.
-      {:ex_ratatui, path: "../ex_ratatui"},
+      {:ex_ratatui, "~> 0.10"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.1"},
       {:telemetry, "~> 1.0"},
@@ -84,15 +80,7 @@ defmodule PhoenixExRatatui.MixProject do
       # Dev
       {:ex_doc, "~> 0.35", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-
-      # Path-deps fallback: ex_ratatui's NIF compile path needs rustler
-      # available when no precompiled binary is found for the current
-      # target. Required while we depend on ex_ratatui via `path:`. Once
-      # ex_ratatui ships a release with CellSession and we flip to
-      # `{:ex_ratatui, "~> 0.9"}`, this dep can drop — released versions
-      # ship precompiled binaries for every supported target.
-      {:rustler, ">= 0.0.0", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
   end
 
