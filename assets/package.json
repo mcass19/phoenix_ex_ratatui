@@ -6,7 +6,8 @@
   "description": "JS bundle for the phoenix_ex_ratatui LiveView hook (DOM cell-grid painter, no terminal emulator).",
   "scripts": {
     "build": "node build.js",
-    "build:dev": "node build.js --dev"
+    "build:dev": "node build.js --dev",
+    "test": "node --test"
   },
   "devDependencies": {
     "esbuild": "0.28.0"
