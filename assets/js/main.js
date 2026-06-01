@@ -32,6 +32,12 @@ const NAMED_COLORS = {
   white: "#eeeeec",
 };
 
+// `reversed` falls back to these when the cell has no concrete fg/bg
+// to swap. Picking white-on-black matches the xterm-y default that
+// most ratatui themes assume.
+const DEFAULT_FG = NAMED_COLORS.white;
+const DEFAULT_BG = NAMED_COLORS.black;
+
 function colorToCss(color) {
   if (color == null || color === "reset") return null;
   if (typeof color === "string") return NAMED_COLORS[color] ?? null;
@@ -64,28 +70,80 @@ function indexedColor(n) {
 }
 
 // ----------------------------------------------------------------------
-// Style assembly
+// Per-cell base styling lives in a CSS class injected once into the
+// document. Keeping `display`/`width`/`height`/`text-align` out of
+// inline style means setCell() can do a single short cssText write
+// for the dynamic bits (color, weight, ...) without re-parsing the
+// base each frame. Dimensions ride on CSS variables set on the
+// container so multiple hooks with different font sizes coexist.
 // ----------------------------------------------------------------------
 
-function styleFor(fg, bg, modifiers) {
-  const parts = [];
-  const fgCss = colorToCss(fg);
-  const bgCss = colorToCss(bg);
-  if (fgCss) parts.push(`color:${fgCss}`);
-  if (bgCss) parts.push(`background-color:${bgCss}`);
+const STYLE_TAG_ID = "phx-ex-ratatui-cell-style";
 
-  if (modifiers.includes("bold")) parts.push("font-weight:bold");
-  if (modifiers.includes("italic")) parts.push("font-style:italic");
-  if (modifiers.includes("dim")) parts.push("opacity:0.6");
+function ensureBaseStyle() {
+  if (document.getElementById(STYLE_TAG_ID)) return;
+  const tag = document.createElement("style");
+  tag.id = STYLE_TAG_ID;
+  tag.textContent =
+    ".pxr-row{display:flex;line-height:1}" +
+    ".pxr-cell{display:inline-block;width:var(--pxr-cw);height:var(--pxr-ch);text-align:center}";
+  document.head.appendChild(tag);
+}
 
-  const decorations = [];
-  if (modifiers.includes("underlined")) decorations.push("underline");
-  if (modifiers.includes("crossed_out")) decorations.push("line-through");
-  if (decorations.length) parts.push(`text-decoration:${decorations.join(" ")}`);
+// ----------------------------------------------------------------------
+// Style assembly
+// ----------------------------------------------------------------------
+//
+// Walks the modifiers array exactly once and returns:
+//   { fg, bg, mods, css }
+// where `css` is the dynamic-only declaration string we'll assign to
+// `cell.style.cssText`. fg/bg in the result are the *resolved* CSS
+// strings ("" when none) — useful as memo fields because two source
+// shapes that resolve identically (null vs "reset", indexed vs rgb
+// for the same color) hit the memo correctly.
+//
+// `reversed` is implemented as an fg/bg swap (with a default-color
+// fallback when one side is null) instead of `filter:invert(1)`.
+// `filter` creates a per-cell stacking context in Firefox that's
+// genuinely expensive at TUI grid sizes.
+function buildStyle(fg, bg, modifiers) {
+  let fgCss = colorToCss(fg) || "";
+  let bgCss = colorToCss(bg) || "";
 
-  if (modifiers.includes("reversed")) parts.push("filter:invert(1)");
+  let bold = false, italic = false, dim = false;
+  let under = false, cross = false, reversed = false;
+  // Single pass through modifiers — .includes() called 6 times means
+  // 6 array scans; this is one.
+  for (let i = 0; i < modifiers.length; i++) {
+    const m = modifiers[i];
+    if (m === "bold") bold = true;
+    else if (m === "italic") italic = true;
+    else if (m === "dim") dim = true;
+    else if (m === "underlined") under = true;
+    else if (m === "crossed_out") cross = true;
+    else if (m === "reversed") reversed = true;
+  }
 
-  return parts.join(";");
+  if (reversed) {
+    const newFg = bgCss || DEFAULT_BG;
+    const newBg = fgCss || DEFAULT_FG;
+    fgCss = newFg;
+    bgCss = newBg;
+  }
+
+  // Build the cssText incrementally. Concatenation with a mutable
+  // string is faster than push+join for short strings on V8/SpiderMonkey.
+  let css = "";
+  if (fgCss) css = "color:" + fgCss;
+  if (bgCss) css += (css ? ";" : "") + "background-color:" + bgCss;
+  if (bold) css += (css ? ";" : "") + "font-weight:bold";
+  if (italic) css += (css ? ";" : "") + "font-style:italic";
+  if (dim) css += (css ? ";" : "") + "opacity:0.6";
+  if (under && cross) css += (css ? ";" : "") + "text-decoration:underline line-through";
+  else if (under) css += (css ? ";" : "") + "text-decoration:underline";
+  else if (cross) css += (css ? ";" : "") + "text-decoration:line-through";
+
+  return { fg: fgCss, bg: bgCss, css };
 }
 
 // ----------------------------------------------------------------------
@@ -143,6 +201,8 @@ export const PhoenixExRatatuiHook = {
     if (!this.el.style.lineHeight) this.el.style.lineHeight = "1";
     if (!this.el.style.overflow) this.el.style.overflow = "hidden";
 
+    ensureBaseStyle();
+
     // Full-page LV TUIs auto-focus on mount so users don't have to
     // click the cell grid before keystrokes flow. The macro sets
     // `data-phx-ex-ratatui-autofocus="true"` on the container.
@@ -179,6 +239,10 @@ export const PhoenixExRatatuiHook = {
     this.charWidth = rect.width || 8;
     this.charHeight = rect.height || 16;
     probe.remove();
+
+    // Publish geometry to the cell stylesheet via CSS vars.
+    this.el.style.setProperty("--pxr-cw", this.charWidth + "px");
+    this.el.style.setProperty("--pxr-ch", this.charHeight + "px");
   },
 
   reportSize() {
@@ -220,13 +284,20 @@ export const PhoenixExRatatuiHook = {
 
     for (let r = 0; r < height; r++) {
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;line-height:1";
+      row.className = "pxr-row";
       const rowCells = new Array(width);
 
       for (let c = 0; c < width; c++) {
         const cell = document.createElement("span");
-        cell.style.cssText = `display:inline-block;width:${this.charWidth}px;height:${this.charHeight}px;text-align:center`;
+        cell.className = "pxr-cell";
         cell.textContent = " ";
+        // Pre-seed memo fields so the first paint still memo-skips
+        // empty-on-empty cells (server diffs after a resize often
+        // emit unchanged blanks).
+        cell._sym = " ";
+        cell._fg = "";
+        cell._bg = "";
+        cell._mods = "";
         row.appendChild(cell);
         rowCells[c] = cell;
       }
@@ -241,13 +312,39 @@ export const PhoenixExRatatuiHook = {
     if (!rowCells) return;
     const cell = rowCells[col];
     if (!cell) return;
-
     if (skip) return;
 
-    cell.textContent = sym;
-    const baseStyle = `display:inline-block;width:${this.charWidth}px;height:${this.charHeight}px;text-align:center`;
-    const extra = styleFor(fg, bg, modifiers);
-    cell.style.cssText = extra ? `${baseStyle};${extra}` : baseStyle;
+    // Cheap modifiers key — a stable string, computed once. We use it
+    // both for the memo compare and (implicitly) inside buildStyle's
+    // single pass. modifiers is typically 0–3 entries so join is
+    // basically free.
+    const modsKey = modifiers.length ? modifiers.join(",") : "";
+    const built = buildStyle(fg, bg, modifiers);
+
+    // Memo: compare resolved fields, not raw inputs. This catches
+    // semantic equality (null vs "reset", named vs indexed for the
+    // same color) and avoids JSON.stringify on the hot path.
+    if (
+      cell._sym === sym &&
+      cell._fg === built.fg &&
+      cell._bg === built.bg &&
+      cell._mods === modsKey
+    ) {
+      return;
+    }
+
+    cell._sym = sym;
+    cell._fg = built.fg;
+    cell._bg = built.bg;
+    cell._mods = modsKey;
+
+    if (cell.textContent !== sym) cell.textContent = sym;
+
+    // Single short cssText write — no base style mixed in, so the
+    // engine parses ~30–80 chars instead of ~150. When there's no
+    // dynamic style at all, assigning "" is the cheapest form of
+    // clear.
+    cell.style.cssText = built.css;
   },
 
   onKeydown(event) {
@@ -267,8 +364,10 @@ export default PhoenixExRatatuiHook;
 export const __test__ = {
   colorToCss,
   indexedColor,
-  styleFor,
+  buildStyle,
   keyToCode,
   modifiersFor,
   NAMED_COLORS,
+  DEFAULT_FG,
+  DEFAULT_BG,
 };
