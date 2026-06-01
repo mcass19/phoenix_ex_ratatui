@@ -237,8 +237,8 @@ defmodule PhoenixExRatatui.Transport do
   # The writer_fn handed to ExRatatui.Server. Called from the server
   # process on every render with the freshly-extracted diff. We forward
   # it verbatim to the LiveView; encoding to JSON for `push_event/3`
-  # happens in the LiveView itself (PhoenixExRatatui.Renderer.Html in
-  # a follow-up chunk), so the wire payload here stays a struct.
+  # happens in the LiveView itself (via PhoenixExRatatui.Renderer.Html),
+  # so the wire payload here stays a struct.
   defp validate_required!(target, width, height) do
     if is_pid(target) and is_integer(width) and width > 0 and is_integer(height) and height > 0 do
       :ok

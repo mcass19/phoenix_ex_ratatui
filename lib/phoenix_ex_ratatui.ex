@@ -11,7 +11,7 @@ defmodule PhoenixExRatatui do
   ANSI on the wire — just structured cell deltas pushed over the
   LiveView socket.
 
-  Two entry points are planned:
+  Two entry points are available:
 
     * `PhoenixExRatatui.LiveView` — full-page entry, mount via the
       router (`live "/tui", PhoenixExRatatui.LiveView, ...`).
@@ -62,10 +62,15 @@ defmodule PhoenixExRatatui do
   container as defaults; users override any of those via their own
   CSS).
 
-  ## Status
+  ## Installation
 
-  Pre-release. Public API is being built up chunk by chunk; until
-  the first hex release, depend on this from a path checkout. See
-  [CONTRIBUTING.md](contributing.html) for the local-dev story.
+  Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
+
+  ```elixir
+  {:phoenix_ex_ratatui, "~> 0.1"}
+  ```
+
+  It pulls in `ex_ratatui` (`~> 0.10`) transitively, which ships a
+  precompiled NIF — no Rust toolchain required.
   """
 end

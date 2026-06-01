@@ -24,10 +24,9 @@ defmodule Demo.MixProject do
 
   defp deps do
     [
-      # Local sibling checkouts. Once both libraries are released,
-      # users replace these with hex versions:
-      #   {:phoenix_ex_ratatui, "~> 0.1"}
-      #   {:ex_ratatui, "~> 0.9"}   # transitively
+      # Local checkout of the parent lib so the demo tracks unreleased
+      # changes. A standalone app instead depends on the hex package:
+      #   {:phoenix_ex_ratatui, "~> 0.1"}   # pulls ex_ratatui ~> 0.10
       {:phoenix_ex_ratatui, path: "../.."},
       {:ex_ratatui, path: "../../../ex_ratatui", override: true},
 

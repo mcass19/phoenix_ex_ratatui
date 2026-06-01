@@ -149,26 +149,24 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 The hook handles cell measurement, paint, key forwarding, and resize reporting. It sets sensible defaults on the container (monospace font, `white-space: pre`, `line-height: 1`) only if you haven't supplied your own, so you can theme freely with CSS.
 
-## Status
+## Installation
 
-**Pre-release.** This package depends on a `:cell_session` transport tag in `ex_ratatui` that lives in ex_ratatui's `[Unreleased]` CHANGELOG section. Until that release ships, depend on `phoenix_ex_ratatui` from a path checkout:
-
-```elixir
-# in your mix.exs
-{:phoenix_ex_ratatui, path: "../phoenix_ex_ratatui"},
-{:ex_ratatui, path: "../ex_ratatui", override: true}
-```
-
-After the next ex_ratatui release lands, this flips to:
+Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
 
 ```elixir
-{:phoenix_ex_ratatui, "~> 0.1"}
+def deps do
+  [
+    {:phoenix_ex_ratatui, "~> 0.1"}
+  ]
+end
 ```
+
+It pulls in [`ex_ratatui`](https://hex.pm/packages/ex_ratatui) (`~> 0.10`) transitively, which ships a precompiled NIF — no Rust toolchain required. After `mix deps.get`, wire up the JS hook as shown in [Wiring the JS hook](#wiring-the-js-hook) above.
 
 ## Quick links
 
 - [Getting Started guide](guides/getting_started.md) — extended walkthrough of both APIs
-- [`examples/demo/`](examples/demo/) — minimal Phoenix app with the unified LV and LC side-by-side
+- [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo) — minimal Phoenix app with the unified LV and LC side-by-side
 - [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the full-page macro
 - [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable macro
 - [`PhoenixExRatatui.Telemetry`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Telemetry.html) — `:telemetry` events catalogue + `Telemetry.Metrics` wiring example
@@ -180,4 +178,4 @@ PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui),
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/mcass19/phoenix_ex_ratatui/blob/main/LICENSE) for details.
