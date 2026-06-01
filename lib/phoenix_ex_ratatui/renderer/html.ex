@@ -123,6 +123,13 @@ defmodule PhoenixExRatatui.Renderer.Html do
   Encodes a single cell into the 7-element list shape. Exposed for
   callers that need finer-grained control (e.g. encoding cells from
   a `Snapshot` rather than a `Diff`, or building a diff op by hand).
+
+  ## Examples
+
+      iex> alias ExRatatui.CellSession.Cell
+      iex> cell = %Cell{row: 3, col: 7, symbol: "A", fg: :green, bg: :reset, modifiers: [:bold], skip: false}
+      iex> PhoenixExRatatui.Renderer.Html.encode_cell(cell)
+      [3, 7, "A", "green", "reset", ["bold"], false]
   """
   @spec encode_cell(Cell.t()) :: encoded_cell()
   def encode_cell(%Cell{

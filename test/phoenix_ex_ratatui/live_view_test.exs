@@ -25,6 +25,8 @@ defmodule PhoenixExRatatui.LiveViewTest do
   alias PhoenixExRatatui.LiveView, as: PXRLV
   alias PhoenixExRatatui.TestLive
 
+  doctest PhoenixExRatatui.LiveView
+
   @endpoint PhoenixExRatatui.TestEndpoint
 
   describe "__build_using_quote__/1 (compile-time helper)" do
@@ -304,6 +306,23 @@ defmodule PhoenixExRatatui.LiveViewTest do
 
       [first_op | _] = payload["ops"]
       assert is_list(first_op) and length(first_op) == 7
+    end
+
+    test "the pushed ops carry the symbols the app actually painted" do
+      # TestLive paints "n=0" at row 0 (see PhoenixExRatatui.TestApp).
+      # This pins the full server -> wire contract: not just that a
+      # frame fired, but that the rendered glyphs reach the client at
+      # the right cells.
+      {:ok, view, _html} = live_isolated(build_conn(), TestLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{"cols" => 20, "rows" => 4})
+      assert_push_event(view, "phx_ex_ratatui:render", payload, 1000)
+
+      # Each op is [row, col, sym, fg, bg, mods, skip]. Pull row 0's
+      # first three cells and assert the painted text.
+      row0 = for [0, col, sym | _] <- payload["ops"], col in 0..2, do: {col, sym}
+
+      assert Enum.sort(row0) == [{0, "n"}, {1, "="}, {2, "0"}]
     end
 
     @tag capture_log: true

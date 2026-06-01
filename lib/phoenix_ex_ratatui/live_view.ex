@@ -148,6 +148,12 @@ defmodule PhoenixExRatatui.LiveView do
   the atoms (`:ctrl`, `:alt`, `:shift`, `:super`, `:hyper`, `:meta`)
   are pre-loaded by `ExRatatui.Event.Key`, so untrusted client input
   cannot grow the atom table.
+
+  ## Examples
+
+      iex> event = PhoenixExRatatui.LiveView.decode_input(%{"kind" => "key", "code" => "a", "modifiers" => ["ctrl"]})
+      iex> {event.code, event.modifiers, event.kind}
+      {"a", [:ctrl], "press"}
   """
   @spec decode_input(map()) :: ExRatatui.Event.t()
   def decode_input(%{"kind" => "key"} = params) do
