@@ -59,15 +59,15 @@ defmodule PhoenixExRatatui.Telemetry do
 
   ## Attaching a default logger
 
-      # In your Application.start/2 (or iex during dev):
+      # In Application.start/2 (or iex during dev):
       PhoenixExRatatui.Telemetry.attach_default_logger()
 
   That attaches a handler logging every `:stop` and single event at
   `:debug` level. Pass `attach_default_logger(level: :info)` to bump
   the level. Detach with `detach_default_logger/0`.
 
-  Real apps wire `Telemetry.Metrics` instead — define metrics in
-  your `MyApp.Telemetry` and they show up in the `LiveDashboard`'s
+  Real apps wire `Telemetry.Metrics` instead — define metrics in a
+  `MyApp.Telemetry` module and they show up in the `LiveDashboard`'s
   Metrics tab automatically. Example:
 
       defmodule MyApp.Telemetry do

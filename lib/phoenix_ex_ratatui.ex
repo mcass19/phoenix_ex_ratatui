@@ -28,7 +28,7 @@ defmodule PhoenixExRatatui do
   `lib/assets/phoenix_ex_ratatui/main.js` and is exposed as a
   resolvable npm module via the package's top-level `package.json`.
 
-  Add `phoenix_ex_ratatui` to your `assets/package.json` alongside
+  Add `phoenix_ex_ratatui` to `assets/package.json` alongside
   Phoenix's own JS deps (the `file:` path follows the same shape):
 
   ```json
@@ -42,8 +42,8 @@ defmodule PhoenixExRatatui do
   }
   ```
 
-  Run `npm install` (or whatever your asset-pipeline manager calls
-  it) to symlink the package, then import the hook in your
+  Run `npm install` (or whatever the asset-pipeline manager calls
+  it) to symlink the package, then import the hook in
   `assets/js/app.js`:
 
   ```js

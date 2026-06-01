@@ -9,13 +9,92 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 
 `PhoenixExRatatui` is the LiveView counterpart to [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui): a thin transport that pipes the runtime's rendered **cell buffer** to the browser, where a small JS hook paints cells directly into the DOM as `<span>` elements. No terminal emulator, no ANSI on the wire — just structured cell deltas over the LiveView socket. Phones get real touch events.
 
-## Two ways to mount a TUI
+![PhoenixExRatatui Demo](https://raw.githubusercontent.com/mcass19/phoenix_ex_ratatui/main/assets/demo.gif)
 
-Both shapes are **unified modules** — the same module is both a Phoenix LiveView/LiveComponent and the `ExRatatui.App` driving it. The macro auto-generates a hidden `Module.Runtime` proxy that conforms to `ExRatatui.App` by delegating to your `tui_*` callbacks.
+## Features
+
+- **Two unified-module APIs** — `use PhoenixExRatatui.LiveView` for a full-page TUI route, `use PhoenixExRatatui.LiveComponent` to embed a TUI inside an existing LiveView. The same module is both the Phoenix component and the `ExRatatui.App` driving it; a hidden `Module.Runtime` proxy bridges the two `handle_info/2` arities.
+- **Callback and reducer runtimes** — `runtime: :reducer` opts into command/subscription-driven apps (`tui_init/1` + `tui_update/2` + `tui_subscriptions/1`); the default `:callbacks` runtime uses `tui_mount/1` + `tui_handle_event/2` + `tui_handle_info/2`.
+- **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas. Arrays not objects, to roughly halve the wire size on full frames.
+- **Tiny, dependency-free JS hook** — ~4KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
+- **Inter-page navigation via runtime intents** — return `{:navigate, "/path"}`, `:patch`, or `:redirect` (internal or external) from any handler; the macro dispatches through `push_navigate/2` and friends.
+- **Auto-focus on full-page TUIs** — keystrokes flow without clicking the grid first. Embedded components deliberately don't steal focus.
+- **`:telemetry` integration** — transport connect/disconnect spans, a per-frame render span, and input-forward events, layered above the events `ex_ratatui` already emits.
+- **Full color and modifiers** — named, RGB, and 256-color indexed; bold, italic, underline, and more, inherited straight from ExRatatui.
+
+## Examples
+
+The [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo) Phoenix app showcases the unified LV and LC side-by-side:
+
+| View | Route | Demonstrates |
+|------|-------|--------------|
+| Home | `/` | Full-page LiveView, callbacks runtime, navigation intents |
+| Chat | `/chat` | Markdown, Textarea, Throbber, a slash-command popup, and scrollback |
+| Admin | `/admin` | An embedded reducer-runtime `LiveComponent` with a live Gauge/Table system monitor |
+
+Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
+
+## Installation
+
+Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
 
 ```elixir
-# 1. Full-page TUI route — same module is both the Phoenix.LiveView
-#    and the App.
+def deps do
+  [
+    {:phoenix_ex_ratatui, "~> 0.1"}
+  ]
+end
+```
+
+Then fetch:
+
+```sh
+mix deps.get
+```
+
+### Prerequisites
+
+- Elixir 1.17+
+- Phoenix LiveView 1.1+
+
+`phoenix_ex_ratatui` pulls in [`ex_ratatui`](https://hex.pm/packages/ex_ratatui) (`~> 0.10`) transitively, which ships a precompiled NIF — no Rust toolchain required.
+
+### Wiring the JS hook
+
+The hook is resolved as a normal npm module. Add it to `assets/package.json` alongside Phoenix's own JS deps:
+
+```json
+{
+  "dependencies": {
+    "phoenix": "file:../deps/phoenix",
+    "phoenix_html": "file:../deps/phoenix_html",
+    "phoenix_live_view": "file:../deps/phoenix_live_view",
+    "phoenix_ex_ratatui": "file:../deps/phoenix_ex_ratatui"
+  }
+}
+```
+
+Run `npm install` (or `cd assets && npm install`), then import the hook in `assets/js/app.js`:
+
+```js
+import { Socket } from "phoenix"
+import { LiveSocket } from "phoenix_live_view"
+import { PhoenixExRatatuiHook } from "phoenix_ex_ratatui"
+
+const liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { PhoenixExRatatuiHook }
+})
+```
+
+The hook sets sensible defaults on the container (monospace font, `white-space: pre`, `line-height: 1`) only when they aren't already supplied, so the grid stays themeable with CSS.
+
+## Quick Start
+
+Both shapes are **unified modules** — the same module is both a Phoenix LiveView/LiveComponent and the `ExRatatui.App` driving it. The macro auto-generates a hidden `Module.Runtime` proxy that conforms to `ExRatatui.App` by delegating to the `tui_*` callbacks.
+
+### Full-page TUI route
+
+```elixir
 defmodule MyAppWeb.MyTuiLive do
   use PhoenixExRatatui.LiveView
 
@@ -37,13 +116,13 @@ defmodule MyAppWeb.MyTuiLive do
   def tui_handle_event(_event, state), do: {:noreply, state}
 end
 
-# In your router (no special macro):
+# In the router (no special macro):
 live "/tui", MyAppWeb.MyTuiLive
 ```
 
+### Embedded LiveComponent
+
 ```elixir
-# 2. Embedded LiveComponent — same shape, drops a TUI inside an
-#    existing LiveView's render alongside non-TUI content.
 defmodule MyAppWeb.AdminCounterPanel do
   use PhoenixExRatatui.LiveComponent
 
@@ -65,7 +144,25 @@ defmodule MyAppWeb.AdminLive do
 end
 ```
 
-Both drive the same `PhoenixExRatatui.Transport` underneath — a `CellSession` + `ExRatatui.Server` pair that ships rendered cell diffs to the browser as `phx_ex_ratatui:render` events.
+## How It Works
+
+```
+┌─────────────────┐   tui_* callbacks   ┌──────────────────────┐
+│  Your module    │ ◀────────────────── │  Module.Runtime      │  (hidden proxy,
+│  (LiveView/LC)  │                     │  conforms to App     │   generated by macro)
+└────────┬────────┘                     └──────────┬───────────┘
+         │                                         │
+         │ PhoenixExRatatui.Transport              │ ExRatatui.Server
+         ▼                                         ▼
+   CellSession  ──── %CellSession.Diff{} ────▶  Renderer.Html
+                                                   │
+                          push_event("phx_ex_ratatui:render", payload)
+                                                   ▼
+                                       JS hook paints <span> cells
+   browser keydown ──── "phx_ex_ratatui:input" ────▶ back into the runtime
+```
+
+A `CellSession` plus a linked `ExRatatui.Server` drive the module. On each render the server hands a `%CellSession.Diff{}` to the transport, which forwards it to the LiveView; `PhoenixExRatatui.Renderer.Html` encodes it to a JSON-friendly payload and `push_event/3`s it to the browser. The hook paints the deltas and forwards keystrokes back as `phx_ex_ratatui:input` events. Because the `Server` is linked to the LiveView process, teardown is deterministic — when the LiveView exits, the session closes and disconnect telemetry fires.
 
 ## Inter-page navigation via runtime intents
 
@@ -90,9 +187,9 @@ Recognised intent shapes:
 | `{:redirect, "/path"}` | `Phoenix.LiveView.redirect/2` (internal) |
 | `{:redirect, [external: "https://…"]}` | `redirect/2` to an external URL |
 
-Unrecognised intents are dropped (logged at warning) so a TUI stays portable across consumers — return whatever your runtime understands and the LV ignores the rest.
+Unrecognised intents are dropped (logged at warning) so a TUI stays portable across consumers — return whatever the runtime understands and the LV ignores the rest.
 
-For the embeddable `LiveComponent`, intents bubble up to the parent LV via `send/2` (Phoenix LV forbids redirects from inside `LiveComponent.update/2`). Add this clause to your parent LV:
+For the embeddable `LiveComponent`, intents bubble up to the parent LV via `send/2` (Phoenix LV forbids redirects from inside `LiveComponent.update/2`). Add this clause to the parent LV:
 
 ```elixir
 def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
@@ -120,61 +217,21 @@ defmodule MyAppWeb.AdminTui do
 end
 ```
 
-## Wiring the JS hook
+## Guides
 
-The hook is resolved as a normal npm module. Add it to your `assets/package.json` alongside Phoenix's own JS deps:
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](guides/getting_started.md) | Extended walkthrough of both the full-page and embedded APIs, the JS hook wiring, and the typical project structure |
 
-```json
-{
-  "dependencies": {
-    "phoenix": "file:../deps/phoenix",
-    "phoenix_html": "file:../deps/phoenix_html",
-    "phoenix_live_view": "file:../deps/phoenix_live_view",
-    "phoenix_ex_ratatui": "file:../deps/phoenix_ex_ratatui"
-  }
-}
-```
+Module references:
 
-Run `npm install` (or `cd assets && npm install`), then import the hook in your `assets/js/app.js`:
-
-```js
-import { Socket } from "phoenix"
-import { LiveSocket } from "phoenix_live_view"
-import { PhoenixExRatatuiHook } from "phoenix_ex_ratatui"
-
-const liveSocket = new LiveSocket("/live", Socket, {
-  hooks: { PhoenixExRatatuiHook }
-})
-```
-
-The hook handles cell measurement, paint, key forwarding, and resize reporting. It sets sensible defaults on the container (monospace font, `white-space: pre`, `line-height: 1`) only if you haven't supplied your own, so you can theme freely with CSS.
-
-## Installation
-
-Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:phoenix_ex_ratatui, "~> 0.1"}
-  ]
-end
-```
-
-It pulls in [`ex_ratatui`](https://hex.pm/packages/ex_ratatui) (`~> 0.10`) transitively, which ships a precompiled NIF — no Rust toolchain required. After `mix deps.get`, wire up the JS hook as shown in [Wiring the JS hook](#wiring-the-js-hook) above.
-
-## Quick links
-
-- [Getting Started guide](guides/getting_started.md) — extended walkthrough of both APIs
-- [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo) — minimal Phoenix app with the unified LV and LC side-by-side
 - [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the full-page macro
 - [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable macro
-- [`PhoenixExRatatui.Telemetry`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Telemetry.html) — `:telemetry` events catalogue + `Telemetry.Metrics` wiring example
-- [CONTRIBUTING.md](CONTRIBUTING.md) — local-dev setup
+- [`PhoenixExRatatui.Telemetry`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Telemetry.html) — `:telemetry` events catalogue and `Telemetry.Metrics` wiring example
 
 ## Contributing
 
-PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. If you're interested in improving the underlying rendering, widgets, or layout engine, contributions to ExRatatui are very welcome too.
+PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. Contributions to the underlying rendering, widgets, or layout engine are very welcome there too. See [CONTRIBUTING.md](CONTRIBUTING.md) for the local-dev setup.
 
 ## License
 

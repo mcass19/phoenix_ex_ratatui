@@ -6,7 +6,7 @@ defmodule PhoenixExRatatui.LiveView do
 
   ## Quick start
 
-      # In your router (no special macro needed):
+      # In the router (no special macro needed):
       live "/tui", MyAppWeb.MyTuiLive
 
       # The live module:
@@ -37,17 +37,17 @@ defmodule PhoenixExRatatui.LiveView do
   implementation (mount/3, render/1, handle_event/3, handle_info/2)
   AND, via `@after_compile`, generates a sibling
   `MyAppWeb.MyTuiLive.Runtime` module that implements `ExRatatui.App`
-  by delegating to the `tui_*` callbacks on your module.
+  by delegating to the `tui_*` callbacks on the calling module.
 
   The runtime proxy exists because `Phoenix.LiveView.handle_info/2`
   (msg, socket) and `ExRatatui.App.handle_info/2` (msg, state) collide
   on arity. Splitting the App into a hidden submodule lets both
   behaviours live side-by-side without renaming Phoenix LV callbacks.
 
-  You don't have to think about the proxy — write `tui_*` callbacks,
-  the macro handles the rest.
+  The proxy needs no attention — define the `tui_*` callbacks and the
+  macro handles the rest.
 
-  ## TUI callbacks (override what you need)
+  ## TUI callbacks (override as needed)
 
     * `tui_mount(opts)` — return `{:ok, state}`, `{:ok, state,
       runtime_opts}`, or `{:error, reason}`. `opts` is the keyword

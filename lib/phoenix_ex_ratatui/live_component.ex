@@ -5,9 +5,9 @@ defmodule PhoenixExRatatui.LiveComponent do
   the `ExRatatui.App` it drives.
 
   Where `PhoenixExRatatui.LiveView` makes the page itself a TUI, this
-  macro lets you drop a TUI inside an existing LiveView alongside
-  whatever else that LV is rendering — admin dashboards, dev consoles,
-  half-page overlays.
+  macro drops a TUI inside an existing LiveView alongside whatever else
+  that LV is rendering — admin dashboards, dev consoles, half-page
+  overlays.
 
   ## Quick start
 
@@ -37,7 +37,7 @@ defmodule PhoenixExRatatui.LiveComponent do
   Same trick as `PhoenixExRatatui.LiveView`: the macro injects
   `Phoenix.LiveComponent` callbacks AND, via `@after_compile`,
   generates a sibling `Module.Runtime` proxy that conforms to
-  `ExRatatui.App` by delegating to your `tui_*` callbacks. The
+  `ExRatatui.App` by delegating to the `tui_*` callbacks. The
   `handle_info/2` arity collision between LV and ExRatatui.App is
   the same in LiveComponents (well, LCs don't have handle_info, but
   the abstraction stays consistent).
@@ -81,7 +81,7 @@ defmodule PhoenixExRatatui.LiveComponent do
   must trap exits** for this to work — otherwise the EXIT signal
   kills the whole LV. We set `Process.flag(:trap_exit, true)` lazily
   on the first resize event before calling `Transport.start_link/1`.
-  This sets it on the parent LV process; if your LV traps exits for
+  This sets it on the parent LV process; if that LV traps exits for
   other reasons, the flag is shared.
 
   ## Intents and the parent LV
@@ -104,10 +104,10 @@ defmodule PhoenixExRatatui.LiveComponent do
   `PhoenixExRatatui.LiveView.dispatch_intent/2` handles the standard
   intent shapes (`{:navigate, _}`, `{:patch, _}`, `{:redirect, _}`).
 
-  If you embed the LC inside another `PhoenixExRatatui.LiveView`
-  (rare but supported), this clause is generated for you and you don't
-  have to do anything. For the common case — embedding inside a plain
-  `Phoenix.LiveView` — copy the snippet above.
+  When the LC is embedded inside another `PhoenixExRatatui.LiveView`
+  (rare but supported), this clause is generated automatically. For the
+  common case — embedding inside a plain `Phoenix.LiveView` — copy the
+  snippet above.
 
   ## Telemetry
 
