@@ -7,7 +7,7 @@ defmodule Demo.Application do
     # Print every phoenix_ex_ratatui telemetry event so the demo
     # exposes the integration's full lifecycle on stdout. Real apps
     # wire Telemetry.Metrics into LiveDashboard instead.
-    PhoenixExRatatui.Telemetry.attach_default_logger(level: :info)
+    # PhoenixExRatatui.Telemetry.attach_default_logger(level: :info)
 
     children = [
       {Phoenix.PubSub, name: Demo.PubSub},
