@@ -25,13 +25,11 @@ defmodule DemoWeb.ChatLive do
   """
   use PhoenixExRatatui.LiveView
 
-  alias Demo.UI
+  alias Demo.{Theme, UI}
   alias ExRatatui.Event.Key
   alias ExRatatui.Layout
-  alias ExRatatui.Layout.Rect
+  alias ExRatatui.Layout.{Padding, Rect}
   alias ExRatatui.Style
-
-  alias ExRatatui.Text.Span
 
   alias ExRatatui.Widgets.{
     Block,
@@ -43,6 +41,8 @@ defmodule DemoWeb.ChatLive do
     Throbber,
     WidgetList
   }
+
+  alias ExRatatui.Widgets.Block.Title
 
   alias ExRatatui.Widgets.SlashCommands.Command
 
@@ -198,7 +198,8 @@ defmodule DemoWeb.ChatLive do
         title: "Message",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :magenta}
+        border_style: Theme.border_style(),
+        padding: Padding.horizontal(1)
       }
     }
 
@@ -221,7 +222,7 @@ defmodule DemoWeb.ChatLive do
             selected: state.autocomplete_selected,
             percent_width: 40,
             percent_height: 30,
-            highlight_style: %Style{fg: :black, bg: :light_magenta, modifiers: [:bold]}
+            highlight_style: Theme.selection_style()
           )
 
         popup_widgets ++ widgets
@@ -264,13 +265,19 @@ defmodule DemoWeb.ChatLive do
       items: items,
       scroll_offset: state.scroll_offset,
       block: %Block{
-        title: %Span{
-          content: " ~/phoenix_ex_ratatui/chat (#{length(state.messages)} msgs) ",
-          style: %Style{fg: :light_magenta, modifiers: [:bold]}
-        },
+        title: " ~/phoenix_ex_ratatui/chat ",
+        # Message count pinned right, with a colored underline accent.
+        titles: [
+          %Title{
+            content: " #{length(state.messages)} msgs ",
+            alignment: :right,
+            style: %Style{fg: :light_magenta, modifiers: [:underlined], underline_color: :magenta}
+          }
+        ],
+        title_style: %Style{fg: :light_magenta, modifiers: [:bold]},
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :magenta}
+        border_style: Theme.border_style()
       }
     }
   end

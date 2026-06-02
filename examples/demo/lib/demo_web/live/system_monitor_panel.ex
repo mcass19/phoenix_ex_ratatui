@@ -13,12 +13,14 @@ defmodule DemoWeb.SystemMonitorPanel do
   """
   use PhoenixExRatatui.LiveComponent, runtime: :reducer
 
+  alias Demo.Theme
   alias ExRatatui.Event.Key
   alias ExRatatui.Layout
-  alias ExRatatui.Layout.Rect
+  alias ExRatatui.Layout.{Padding, Rect}
   alias ExRatatui.Style
   alias ExRatatui.Subscription
   alias ExRatatui.Widgets.{Block, Gauge, Paragraph, Table}
+  alias ExRatatui.Widgets.Block.Title
 
   @refresh_interval_ms 2_000
 
@@ -46,10 +48,10 @@ defmodule DemoWeb.SystemMonitorPanel do
     area = %Rect{x: 0, y: 0, width: frame.width, height: frame.height}
 
     [header_area, body_area, footer_area] =
-      Layout.split(area, :vertical, [{:length, 3}, {:min, 0}, {:length, 1}])
+      Layout.split(area, :vertical, [{:length, 3}, {:min, 0}, {:length, 1}], margin: 1)
 
     [left_col, right_col] =
-      Layout.split(body_area, :horizontal, [{:percentage, 50}, {:percentage, 50}])
+      Layout.split(body_area, :horizontal, [{:percentage, 50}, {:percentage, 50}], spacing: 1)
 
     [cpu_area, mem_area, disk_area] =
       Layout.split(left_col, :vertical, [{:length, 3}, {:length, 3}, {:length, 3}])
@@ -72,13 +74,17 @@ defmodule DemoWeb.SystemMonitorPanel do
 
   defp header_widget(state) do
     %Paragraph{
-      text: "  #{state.hostname}    Uptime: #{format_uptime(state.uptime_seconds)}",
-      style: %Style{fg: :light_magenta, modifiers: [:bold]},
+      text: "  Uptime: #{format_uptime(state.uptime_seconds)}",
+      style: Theme.text_style(),
       block: %Block{
         title: " System Monitor ",
+        # Pin the hostname to the right edge of the title bar — one
+        # block, two titles at opposite alignments.
+        titles: [%Title{content: " #{state.hostname} ", alignment: :right}],
+        title_style: %Style{fg: :light_magenta, modifiers: [:bold]},
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :magenta}
+        border_style: Theme.border_style(focused: true)
       }
     }
   end
@@ -108,7 +114,8 @@ defmodule DemoWeb.SystemMonitorPanel do
         title: " CPU Temp ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: Theme.border_style(),
+        padding: Padding.symmetric(1, 0)
       }
     }
   end
@@ -131,7 +138,8 @@ defmodule DemoWeb.SystemMonitorPanel do
         title: " Memory ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: Theme.border_style(),
+        padding: Padding.symmetric(1, 0)
       }
     }
   end
@@ -154,7 +162,8 @@ defmodule DemoWeb.SystemMonitorPanel do
         title: " Disk (/) ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: Theme.border_style(),
+        padding: Padding.symmetric(1, 0)
       }
     }
   end
@@ -173,14 +182,22 @@ defmodule DemoWeb.SystemMonitorPanel do
 
     %Table{
       header: ["Interface", "IP Address"],
+      footer: ["", "#{length(state.interfaces)} total"],
       rows: rows,
       widths: [{:percentage, 40}, {:percentage, 60}],
       style: %Style{fg: :white},
+      header_style: %Style{fg: :light_magenta, modifiers: [:bold]},
+      footer_style: Theme.text_style(dim: true),
+      # Keep the IP column highlighted so the new column-highlight
+      # field is visible without needing row selection.
+      selected_column: 1,
+      column_highlight_style: Theme.selection_style(),
       block: %Block{
         title: " Network ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: Theme.border_style(),
+        padding: Padding.symmetric(1, 0)
       }
     }
   end
@@ -204,7 +221,8 @@ defmodule DemoWeb.SystemMonitorPanel do
         title: " BEAM ",
         borders: [:all],
         border_type: :rounded,
-        border_style: %Style{fg: :dark_gray}
+        border_style: Theme.border_style(),
+        padding: Padding.symmetric(1, 0)
       }
     }
   end

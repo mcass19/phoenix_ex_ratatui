@@ -91,7 +91,7 @@ defmodule DemoWeb.HomeLive do
   end
 
   defp title_frame do
-    %Block{borders: [:all], border_type: :rounded, border_style: %Style{fg: :magenta}}
+    %Block{borders: [:all], border_type: :rounded, border_style: Demo.Theme.border_style()}
   end
 
   defp title_widget do
