@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Ship the `guides/` directory in the Hex package (`mix.exs` `files`) so the Getting Started guide renders on hexdocs.
+
+### Changed
+
+- Move the README demo GIF from `assets/` to `.github/demo.gif`, leaving `assets/` for the JS build pipeline only.
+
+### Examples
+
+- The `examples/demo` app now pulls `ex_ratatui` from Hex transitively through the `phoenix_ex_ratatui` path dependency, dropping the sibling `ex_ratatui` path override and the `rustler` build fallback now that ex_ratatui 0.10 is released.
+
 ## [0.1.0] - 2026-06-01
 
 ### Added
@@ -38,3 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Three-job CI matrix** mirroring [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui)'s shape: Elixir 1.17/Erlang 26.2.5.16, Elixir 1.18/Erlang 27.3.4.6, Elixir 1.19/Erlang 28.2 (lint job). Lint job runs `mix format --check-formatted`, `mix deps.unlock --check-unused`, `mix credo --strict`, `mix compile --warnings-as-errors`, `mix xref graph --format cycles --fail-above 0`, `mix dialyzer --format github`, JS bundle sync verification, and `mix test --cover`. Non-lint jobs run `mix test`.
 
 - **[Getting Started guide](guides/getting_started.md)** walking through both unified-module APIs, the JS hook wiring, and the typical project structure. **[Examples directory](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo)** ships a minimal Phoenix app under `examples/demo/` that demonstrates the unified LV and LC side-by-side — useful as a copy-paste starting point for new integrations.
+
+[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mcass19/phoenix_ex_ratatui/releases/tag/v0.1.0

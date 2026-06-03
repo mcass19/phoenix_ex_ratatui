@@ -25,12 +25,10 @@ defmodule Demo.MixProject do
   defp deps do
     [
       # Local checkout of the parent lib so the demo tracks unreleased
-      # changes. A standalone app instead depends on the hex package:
-      #   {:phoenix_ex_ratatui, "~> 0.1"}   # pulls ex_ratatui ~> 0.10
+      # changes. A standalone app instead depends on the hex package.
       {:phoenix_ex_ratatui, path: "../.."},
-      {:ex_ratatui, path: "../../../ex_ratatui", override: true},
 
-      # Phoenix essentials.
+      # Phoenix essentials
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.1"},
       {:phoenix_html, "~> 4.1"},
@@ -38,14 +36,8 @@ defmodule Demo.MixProject do
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.0"},
 
-      # Asset compilation. esbuild is the only build tool we need —
-      # no Tailwind / SCSS in this demo.
+      # Asset compilation
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
-
-      # Path-deps fallback: ex_ratatui's NIF compile path needs
-      # rustler when no precompiled binary is found. Drops once
-      # ex_ratatui is on hex with a release that ships CellSession.
-      {:rustler, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 end

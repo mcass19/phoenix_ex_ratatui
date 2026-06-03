@@ -27,8 +27,6 @@ mix deps.get
 mix assets.install   # cd assets && npm install
 ```
 
-While ex_ratatui's `CellSession` primitive lives in its `[Unreleased]` CHANGELOG section, this package pins `ex_ratatui` to a sibling `path: "../ex_ratatui"` checkout. Once ex_ratatui cuts a release that ships `CellSession`, the dep flips to `{:ex_ratatui, "~> 0.9"}` (or whatever the version is) and contributors can drop the sibling checkout.
-
 ## Running Tests
 
 ```sh
@@ -36,7 +34,7 @@ mix test
 mix test --cover        # must report 100.00% Total
 ```
 
-The suite uses `Phoenix.LiveViewTest` to drive the live widget end-to-end without a browser.
+The suite uses `Phoenix.LiveViewTest` to drive the live widget end-to-end without a browser. It also includes property-based invariants via [`stream_data`](https://hex.pm/packages/stream_data) — proving the `Renderer.Html` cell/diff encoding round-trips losslessly through JSON across the full input space. Properties run as part of the regular `mix test` invocation.
 
 ## Bundling the JS
 
@@ -49,6 +47,8 @@ cd assets && npm run build:dev   # with sourcemaps
 The bundled output lands at `lib/assets/phoenix_ex_ratatui/main.js`. The file is committed so the published hex package needs no Node toolchain at install time.
 
 If you change anything under `assets/js/`, rerun `mix assets.build` and commit the regenerated bundle.
+
+The hook's pure logic (color/style/key decoding) has unit tests under `assets/test/`. Run them with `cd assets && npm test` — Node's built-in test runner, no extra deps. CI runs them on every push.
 
 ## Branching and Commits
 

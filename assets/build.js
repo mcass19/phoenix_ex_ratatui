@@ -7,10 +7,6 @@
 //   ../lib/assets/phoenix_ex_ratatui/main.js
 //
 // Run via `npm run build` (minified) or `npm run build:dev` (sourcemaps).
-//
-// Unlike kino_ex_ratatui this bundle has no third-party deps — we paint
-// cells directly into the DOM, no terminal emulator. The bundle is
-// pure ES2020 with the Hook surface LiveView calls into.
 import * as esbuild from "esbuild";
 
 const dev = process.argv.includes("--dev");

@@ -9,7 +9,7 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 
 `PhoenixExRatatui` is the LiveView counterpart to [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui): a thin transport that pipes the runtime's rendered **cell buffer** to the browser, where a small JS hook paints cells directly into the DOM as `<span>` elements. No terminal emulator, no ANSI on the wire — just structured cell deltas over the LiveView socket. Phones get real touch events.
 
-![PhoenixExRatatui Demo](https://raw.githubusercontent.com/mcass19/phoenix_ex_ratatui/main/assets/demo.gif)
+![PhoenixExRatatui Demo](https://raw.githubusercontent.com/mcass19/phoenix_ex_ratatui/main/.github/demo.gif)
 
 ## Features
 

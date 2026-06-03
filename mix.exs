@@ -92,7 +92,7 @@ defmodule PhoenixExRatatui.MixProject do
         "Changelog" => @changelog_url
       },
       keywords: ~w(phoenix liveview tui terminal ratatui ex_ratatui),
-      files: ~w(lib package.json .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib guides package.json .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
