@@ -4,7 +4,7 @@ defmodule PhoenixExRatatui.MixProject do
   @description "Run ExRatatui apps inside Phoenix LiveView"
   @source_url "https://github.com/mcass19/phoenix_ex_ratatui"
   @changelog_url @source_url <> "/blob/main/CHANGELOG.md"
-  @version "0.1.0"
+  @version "0.1.1"
 
   def project do
     [

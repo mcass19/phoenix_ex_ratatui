@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-03
+
 ### Fixed
 
 - **Key modifiers now decode to strings, not atoms.** Input from the JS hook produces `%ExRatatui.Event.Key{modifiers: ["ctrl"]}` — the same `[String.t()]` shape the NIF-backed transports (SSH, terminal, kino) emit — instead of `[:ctrl]`. A TUI matching `%Key{modifiers: ["ctrl"]}` now behaves identically across all transports; previously a Ctrl binding written the upstream way silently failed to match under phoenix.
@@ -58,5 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[Getting Started guide](guides/getting_started.md)** walking through both unified-module APIs, the JS hook wiring, and the typical project structure. **[Examples directory](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo)** ships a minimal Phoenix app under `examples/demo/` that demonstrates the unified LV and LC side-by-side — useful as a copy-paste starting point for new integrations.
 
-[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.0...0.1.1
 [0.1.0]: https://github.com/mcass19/phoenix_ex_ratatui/releases/tag/v0.1.0

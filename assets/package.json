@@ -1,6 +1,6 @@
 {
   "name": "phoenix_ex_ratatui_assets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "JS bundle for the phoenix_ex_ratatui LiveView hook (DOM cell-grid painter, no terminal emulator).",
