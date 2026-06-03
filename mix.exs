@@ -51,7 +51,7 @@ defmodule PhoenixExRatatui.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :telemetry]
     ]
   end
 
@@ -100,16 +100,6 @@ defmodule PhoenixExRatatui.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
-      # These references are intentional prose mentions, not links:
-      # ExRatatui.Server is @moduledoc false upstream, and the
-      # handle_info/2 + terminate/2 callbacks aren't autolinkable from
-      # prose. Render them as plain code instead of warning.
-      skip_code_autolink_to: [
-        "ExRatatui.Server",
-        "ExRatatui.App.handle_info/2",
-        "Phoenix.LiveView.handle_info/2",
-        "Phoenix.LiveView.terminate/2"
-      ],
       extras: [
         "README.md": [title: "Overview"],
         "guides/getting_started.md": [title: "Getting Started"],

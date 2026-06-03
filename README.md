@@ -7,9 +7,9 @@
 
 Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix LiveView](https://hexdocs.pm/phoenix_live_view).
 
-`PhoenixExRatatui` is the LiveView counterpart to [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui): a thin transport that pipes the runtime's rendered **cell buffer** to the browser, where a small JS hook paints cells directly into the DOM as `<span>` elements. No terminal emulator, no ANSI on the wire — just structured cell deltas over the LiveView socket. Phones get real touch events.
-
 ![PhoenixExRatatui Demo](https://raw.githubusercontent.com/mcass19/phoenix_ex_ratatui/main/.github/demo.gif)
+
+`PhoenixExRatatui` is a thin transport that pipes the runtime's rendered **cell buffer** to the browser, where a small JS hook paints cells directly into the DOM as `<span>` elements. No terminal emulator, no ANSI on the wire — just structured cell deltas over the LiveView socket.
 
 ## Features
 
@@ -61,8 +61,6 @@ mix deps.get
 
 - Elixir 1.17+
 - Phoenix LiveView 1.1+
-
-`phoenix_ex_ratatui` pulls in [`ex_ratatui`](https://hex.pm/packages/ex_ratatui) (`~> 0.10`) transitively, which ships a precompiled NIF — no Rust toolchain required.
 
 ### Wiring the JS hook
 
@@ -167,7 +165,7 @@ end
    browser keydown ──── "phx_ex_ratatui:input" ────▶ back into the runtime
 ```
 
-A `CellSession` plus a linked `ExRatatui.Server` drive the module. On each render the server hands a `%CellSession.Diff{}` to the transport, which forwards it to the LiveView; `PhoenixExRatatui.Renderer.Html` encodes it to a JSON-friendly payload and `push_event/3`s it to the browser. The hook paints the deltas and forwards keystrokes back as `phx_ex_ratatui:input` events. Because the `Server` is linked to the LiveView process, teardown is deterministic — when the LiveView exits, the session closes and disconnect telemetry fires.
+A `CellSession` plus a linked ExRatatui.Server drive the module. On each render the server hands a `%CellSession.Diff{}` to the transport, which forwards it to the LiveView; `PhoenixExRatatui.Renderer.Html` encodes it to a JSON-friendly payload and `push_event/3`s it to the browser. The hook paints the deltas and forwards keystrokes back as `phx_ex_ratatui:input` events. Because the `Server` is linked to the LiveView process, teardown is deterministic — when the LiveView exits, the session closes and disconnect telemetry fires.
 
 ## Inter-page navigation via runtime intents
 
@@ -229,15 +227,12 @@ end
 | [Getting Started](guides/getting_started.md) | Extended walkthrough of both the full-page and embedded APIs, the JS hook wiring, and the typical project structure |
 | [Telemetry](guides/telemetry.md) | `:telemetry` events for transport, render, input, and intents — logging and `Telemetry.Metrics` |
 
-Module references:
-
-- [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the full-page macro
-- [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable macro
-
 ## Contributing
 
-PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. Contributions to the underlying rendering, widgets, or layout engine are very welcome there too. See [CONTRIBUTING.md](CONTRIBUTING.md) for the local-dev setup.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. If you're interested in improving the underlying rendering, widgets, or layout engine, contributions to ExRatatui are very welcome as well.
 
 ## License
 
-MIT — see [LICENSE](https://github.com/mcass19/phoenix_ex_ratatui/blob/main/LICENSE) for details.
+MIT — see [LICENSE](https://github.com/mcass19/phoenix_ex_ratatui/blob/main/LICENSE).

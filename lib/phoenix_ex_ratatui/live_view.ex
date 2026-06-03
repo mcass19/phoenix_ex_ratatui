@@ -39,8 +39,8 @@ defmodule PhoenixExRatatui.LiveView do
   `MyAppWeb.MyTuiLive.Runtime` module that implements `ExRatatui.App`
   by delegating to the `tui_*` callbacks on the calling module.
 
-  The runtime proxy exists because `Phoenix.LiveView.handle_info/2`
-  (msg, socket) and `ExRatatui.App.handle_info/2` (msg, state) collide
+  The runtime proxy exists because `c:Phoenix.LiveView.handle_info/2`
+  (msg, socket) and `c:ExRatatui.App.handle_info/2` (msg, state) collide
   on arity. Splitting the App into a hidden submodule lets both
   behaviours live side-by-side without renaming Phoenix LV callbacks.
 
@@ -474,7 +474,7 @@ defmodule PhoenixExRatatui.LiveView do
   Intents are emitted by an `ExRatatui.App` from `tui_handle_event/2`
   or `tui_handle_info/2` via the third element of a `{:noreply, state,
   intents: [...]}` (or `{:stop, ...}`) transition. They flow through
-  `ExRatatui.Server`'s `intent_writer_fn` to this LV, where this
+  ExRatatui.Server's `intent_writer_fn` to this LV, where this
   helper maps the intent shape to the equivalent Phoenix LV action.
 
   Recognised intents:

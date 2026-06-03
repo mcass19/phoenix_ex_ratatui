@@ -15,7 +15,7 @@ defmodule PhoenixExRatatui.Telemetry do
   `ex_ratatui` measures the App / runtime layer:
   `[:ex_ratatui, :runtime, :event]`, `[:ex_ratatui, :render, :frame]`,
   `[:ex_ratatui, :session, :lifecycle, *]`, and so on. Those events
-  fire from inside `ExRatatui.Server` regardless of transport.
+  fire from inside ExRatatui.Server regardless of transport.
 
   `phoenix_ex_ratatui` adds events for the Phoenix-side cost:
 
@@ -42,7 +42,7 @@ defmodule PhoenixExRatatui.Telemetry do
 
   | Event | Description | Metadata |
   | ----- | ----------- | -------- |
-  | `[:phoenix_ex_ratatui, :transport, :connect]` | `PhoenixExRatatui.Transport.start_link/1` — constructs `CellSession`, boots `ExRatatui.Server`, runs `mount/1`, ships first frame. | `:mod`, `:width`, `:height`, `:target` |
+  | `[:phoenix_ex_ratatui, :transport, :connect]` | `PhoenixExRatatui.Transport.start_link/1` — constructs `CellSession`, boots ExRatatui.Server, runs `mount/1`, ships first frame. | `:mod`, `:width`, `:height`, `:target` |
   | `[:phoenix_ex_ratatui, :render, :frame]` | Per-frame Phoenix-side work: `Renderer.Html.encode_diff/1` + `Phoenix.LiveView.push_event/3`. | `:mod`, `:width`, `:height`, `:ops_count` |
 
   `:start` events carry `%{monotonic_time: integer, system_time: integer}`

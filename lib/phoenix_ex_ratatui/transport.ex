@@ -52,7 +52,7 @@ defmodule PhoenixExRatatui.Transport do
   exits (browser disconnect, navigation, crash), the server's
   `terminate/2` runs deterministically: closes the `CellSession`, calls
   the user `terminate/2`, emits transport-disconnect telemetry. We do
-  not rely on `Phoenix.LiveView.terminate/2` (which only fires when the
+  not rely on `c:Phoenix.LiveView.terminate/2` (which only fires when the
   socket is `trap_exit`-aware, and we don't recommend that).
   """
 
@@ -77,7 +77,7 @@ defmodule PhoenixExRatatui.Transport do
 
   @doc """
   Constructs an `ExRatatui.CellSession` at `width x height` and starts
-  an `ExRatatui.Server` driving `mod` against it. The server ships
+  an ExRatatui.Server driving `mod` against it. The server ships
   rendered cell diffs to `target` as
   `{:phoenix_ex_ratatui, :render, %CellSession.Diff{}}` messages.
 
