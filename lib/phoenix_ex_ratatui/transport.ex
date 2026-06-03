@@ -108,7 +108,7 @@ defmodule PhoenixExRatatui.Transport do
 
   ## Return shape
 
-      {:ok, %{server: server_pid, cell_session: %CellSession{}}}
+      {:ok, %{server: server_pid, cell_session: %CellSession{}, mod: module}}
 
   Returns whatever error tuple `mod.mount/1` produced if mount fails;
   the `CellSession` is closed defensively before propagating.

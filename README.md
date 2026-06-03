@@ -16,7 +16,7 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 - **Two unified-module APIs** — `use PhoenixExRatatui.LiveView` for a full-page TUI route, `use PhoenixExRatatui.LiveComponent` to embed a TUI inside an existing LiveView. The same module is both the Phoenix component and the `ExRatatui.App` driving it; a hidden `Module.Runtime` proxy bridges the two `handle_info/2` arities.
 - **Callback and reducer runtimes** — `runtime: :reducer` opts into command/subscription-driven apps (`tui_init/1` + `tui_update/2` + `tui_subscriptions/1`); the default `:callbacks` runtime uses `tui_mount/1` + `tui_handle_event/2` + `tui_handle_info/2`.
 - **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas. Arrays not objects, to roughly halve the wire size on full frames.
-- **Tiny, dependency-free JS hook** — ~4KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
+- **Tiny, dependency-free JS hook** — ~5KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
 - **Inter-page navigation via runtime intents** — return `{:navigate, "/path"}`, `:patch`, or `:redirect` (internal or external) from any handler; the macro dispatches through `push_navigate/2` and friends.
 - **Auto-focus on full-page TUIs** — keystrokes flow without clicking the grid first. Embedded components deliberately don't steal focus.
 - **`:telemetry` integration** — transport connect/disconnect spans, a per-frame render span, and input-forward events, layered above the events `ex_ratatui` already emits.
@@ -231,7 +231,7 @@ end
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
-PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. If you're interested in improving the underlying rendering, widgets, or layout engine, contributions to ExRatatui are very welcome as well.
+PhoenixExRatatui is built on [ExRatatui](https://github.com/mcass19/ex_ratatui), a general-purpose terminal UI library for Elixir. Contributions to its underlying rendering, widgets, or layout engine are very welcome too.
 
 ## License
 

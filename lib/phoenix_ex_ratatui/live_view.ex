@@ -123,7 +123,7 @@ defmodule PhoenixExRatatui.LiveView do
   ## Customising LiveView callbacks
 
   All LiveView callbacks (`mount/3`, `render/1`, `handle_event/3`,
-  `handle_info/2`) are `defoverridable`. You can wrap any of them and
+  `handle_info/2`) are `defoverridable` — wrap any of them and
   call `super(...)`:
 
       def mount(params, session, socket) do
@@ -144,16 +144,18 @@ defmodule PhoenixExRatatui.LiveView do
   Decodes the `phx_ex_ratatui:input` payload the JS hook sends into an
   `t:ExRatatui.Event.t/0`.
 
-  Modifier strings are converted with `String.to_existing_atom/1` —
-  the atoms (`:ctrl`, `:alt`, `:shift`, `:super`, `:hyper`, `:meta`)
-  are pre-loaded by `ExRatatui.Event.Key`, so untrusted client input
-  cannot grow the atom table.
+  Modifiers stay as the string list `ExRatatui.Event.Key` uses
+  (`"ctrl"`, `"shift"`, `"alt"`, `"meta"`), so an App matching on
+  `%ExRatatui.Event.Key{modifiers: ["ctrl"]}` behaves the same here as
+  it does over SSH or in a terminal. Keeping them as strings (rather
+  than atoms) also means untrusted client input never grows the atom
+  table.
 
   ## Examples
 
       iex> event = PhoenixExRatatui.LiveView.decode_input(%{"kind" => "key", "code" => "a", "modifiers" => ["ctrl"]})
       iex> {event.code, event.modifiers, event.kind}
-      {"a", [:ctrl], "press"}
+      {"a", ["ctrl"], "press"}
   """
   @spec decode_input(map()) :: ExRatatui.Event.t()
   def decode_input(%{"kind" => "key"} = params) do
@@ -164,8 +166,10 @@ defmodule PhoenixExRatatui.LiveView do
     }
   end
 
+  # Only keep the string modifiers the JS hook sends, matching the
+  # `[String.t()]` shape `ExRatatui.Event.Key` uses everywhere else.
   defp decode_modifiers(modifiers) when is_list(modifiers) do
-    Enum.map(modifiers, &String.to_existing_atom/1)
+    Enum.filter(modifiers, &is_binary/1)
   end
 
   @doc """

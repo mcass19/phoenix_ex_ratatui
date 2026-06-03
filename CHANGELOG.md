@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Key modifiers now decode to strings, not atoms.** Input from the JS hook produces `%ExRatatui.Event.Key{modifiers: ["ctrl"]}` — the same `[String.t()]` shape the NIF-backed transports (SSH, terminal, kino) emit — instead of `[:ctrl]`. A TUI matching `%Key{modifiers: ["ctrl"]}` now behaves identically across all transports; previously a Ctrl binding written the upstream way silently failed to match under phoenix.
 - Ship the `guides/` directory in the Hex package (`mix.exs` `files`) so the Getting Started guide renders on hexdocs.
 - Correct the README examples table: the Home demo runs on the reducer runtime, not callbacks.
+- Fix the documented JS bundle size (~5KB, not ~4KB) and the `Transport.start_link/1` return-shape doc (it includes `:mod`).
 
 ### Changed
 

@@ -252,7 +252,10 @@ defmodule PhoenixExRatatui.LiveViewTest do
              }) == %ExRatatui.Event.Key{code: "a", modifiers: [], kind: "press"}
     end
 
-    test "modifier strings convert to existing atoms only" do
+    test "keeps modifiers as the strings ExRatatui.Event.Key uses" do
+      # Same string shape the NIF-backed transports (SSH, terminal,
+      # kino) produce, so a `%Key{modifiers: ["ctrl"]}` match in an App
+      # behaves identically here — not atoms.
       decoded =
         PXRLV.decode_input(%{
           "kind" => "key",
@@ -260,7 +263,7 @@ defmodule PhoenixExRatatui.LiveViewTest do
           "modifiers" => ["ctrl", "shift"]
         })
 
-      assert decoded.modifiers == [:ctrl, :shift]
+      assert decoded.modifiers == ["ctrl", "shift"]
     end
 
     test "press_kind defaults to \"press\" when omitted" do

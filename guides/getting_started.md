@@ -4,7 +4,7 @@ This guide walks through wiring a TUI into a Phoenix LiveView from scratch, then
 
 ## Project setup
 
-`phoenix_ex_ratatui` runs alongside the rest of a normal Phoenix project — you don't need any special generator. Add the deps:
+`phoenix_ex_ratatui` runs alongside the rest of a normal Phoenix project — no special generator is needed. Add the deps:
 
 ```elixir
 # mix.exs
@@ -18,7 +18,7 @@ defp deps do
 end
 ```
 
-Wire the JS hook. `phoenix_ex_ratatui` ships a top-level `package.json`, so you import it like any other npm module. Add it to your `assets/package.json`:
+Wire the JS hook. `phoenix_ex_ratatui` ships a top-level `package.json`, so it imports like any other npm module. Add it to the `assets/package.json`:
 
 ```json
 {
@@ -31,7 +31,7 @@ Wire the JS hook. `phoenix_ex_ratatui` ships a top-level `package.json`, so you 
 }
 ```
 
-Then `cd assets && npm install` to symlink it, and import the hook in your `assets/js/app.js`:
+Then `cd assets && npm install` to symlink it, and import the hook in `assets/js/app.js`:
 
 ```js
 import { Socket } from "phoenix"
@@ -51,7 +51,7 @@ That's the only client-side wiring. The hook auto-discovers each TUI's container
 
 Both APIs (`PhoenixExRatatui.LiveView` and `PhoenixExRatatui.LiveComponent`) are **unified modules**: the same module is both the Phoenix LiveView/LiveComponent AND the `ExRatatui.App` driving it.
 
-The macro doesn't fight Phoenix's `handle_info/2` callback (which takes a socket) and the App's `handle_info/2` callback (which takes App state) — they have the same name and arity but different semantics. Instead, the macro auto-generates a hidden `Module.Runtime` proxy via `@after_compile` that conforms to `ExRatatui.App` by delegating to a small set of `tui_*` callbacks on your module:
+The macro doesn't fight Phoenix's `handle_info/2` callback (which takes a socket) and the App's `handle_info/2` callback (which takes App state) — they have the same name and arity but different semantics. Instead, the macro auto-generates a hidden `Module.Runtime` proxy via `@after_compile` that conforms to `ExRatatui.App` by delegating to a small set of `tui_*` callbacks on the host module:
 
 | Callback | Purpose | Default |
 |---|---|---|
@@ -62,7 +62,7 @@ The macro doesn't fight Phoenix's `handle_info/2` callback (which takes a socket
 | `tui_terminate(reason, state)` | Cleanup on shutdown | `:ok` |
 | `tui_mount_opts(socket)` | Bridge socket assigns into `tui_mount/1` | `[]` |
 
-All are overridable; you implement what you need. Phoenix's regular LV/LC callbacks (`mount/3`, `render/1`, `handle_event/3`, etc.) remain available and overridable through the same `defoverridable` mechanism.
+All are overridable; implement only what's needed. Phoenix's regular LV/LC callbacks (`mount/3`, `render/1`, `handle_event/3`, etc.) remain available and overridable through the same `defoverridable` mechanism.
 
 ## Two ways to mount a TUI
 
@@ -106,11 +106,11 @@ scope "/", MyAppWeb do
 end
 ```
 
-That's the full integration. The `@after_compile` hook generates `MyAppWeb.CounterLive.Runtime` automatically — you never reference it directly.
+That's the full integration. The `@after_compile` hook generates `MyAppWeb.CounterLive.Runtime` automatically — it's never referenced directly.
 
 #### Threading socket data into the App
 
-When you need to pass per-connection context (current user, session, URL params) from the LiveView mount into `tui_mount/1`, override `tui_mount_opts/1`:
+To pass per-connection context (current user, session, URL params) from the LiveView mount into `tui_mount/1`, override `tui_mount_opts/1`:
 
 ```elixir
 defmodule MyAppWeb.AdminTui do
@@ -128,7 +128,7 @@ defmodule MyAppWeb.AdminTui do
 end
 ```
 
-`super/3` delegates to the macro's default `mount/3` (which sets up internal assigns and trap_exit); you layer your own assigns on top afterward. `tui_mount_opts/1` reads them off the socket and returns the keyword list that becomes `opts` in `tui_mount/1`.
+`super/3` delegates to the macro's default `mount/3` (which sets up internal assigns and trap_exit); layer additional assigns on top afterward. `tui_mount_opts/1` reads them off the socket and returns the keyword list that becomes `opts` in `tui_mount/1`.
 
 ### Option B — Embedded TUI (`PhoenixExRatatui.LiveComponent`)
 
@@ -226,7 +226,7 @@ def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
 end
 ```
 
-If the parent is itself a `PhoenixExRatatui.LiveView`, the clause is generated for you and you don't need to do anything.
+If the parent is itself a `PhoenixExRatatui.LiveView`, the clause is generated automatically — nothing else is needed.
 
 ### Stop-then-redirect
 
@@ -245,7 +245,7 @@ Both integrations emit the same `:telemetry` events, one layer above the events 
 
 ## What about ANSI / xterm.js / a real terminal in a browser?
 
-That's [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui) — same parent library, but it's built around xterm.js and is the right pick when you want a real terminal emulator in the page.
+That's [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui) — same parent library, but it's built around xterm.js and is the right pick for a real terminal emulator in the page.
 
-`phoenix_ex_ratatui` is deliberately different: cells are pushed directly to the DOM as styled `<span>`s. The advantages are that the bundle is tiny (~4KB minified, no third-party deps), phones get real touch events, and the cell grid is just HTML — themeable with CSS, accessible to screen readers, copy/pasteable. The trade-off is no scrollback, no shell semantics, no ANSI alt-screen — if your TUI was relying on those, `kino_ex_ratatui` (or running the App over SSH) is the right call.
+`phoenix_ex_ratatui` is deliberately different: cells are pushed directly to the DOM as styled `<span>`s. The advantages are that the bundle is tiny (~5KB minified, no third-party deps), phones get real touch events, and the cell grid is just HTML — themeable with CSS, accessible to screen readers, copy/pasteable. The trade-off is no scrollback, no shell semantics, no ANSI alt-screen — if a TUI was relying on those, `kino_ex_ratatui` (or running the App over SSH) is the right call.
 
