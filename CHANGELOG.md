@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Ship the `guides/` directory in the Hex package (`mix.exs` `files`) so the Getting Started guide renders on hexdocs.
+- Correct the README examples table: the Home demo runs on the reducer runtime, not callbacks.
 
 ### Changed
 
 - Move the README demo GIF from `assets/` to `.github/demo.gif`, leaving `assets/` for the JS build pipeline only.
+- Promote telemetry to a standalone [Telemetry guide](guides/telemetry.md), extracted from Getting Started and surfaced in the README Guides table — matching `ex_ratatui` and `kino_ex_ratatui`.
+- Add an Ecosystem section to the README linking `ex_ratatui` and `kino_ex_ratatui`.
 
 ### Examples
 

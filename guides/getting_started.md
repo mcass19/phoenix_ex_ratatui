@@ -292,37 +292,7 @@ with your project layout.
 
 ## Telemetry
 
-Both integrations emit the same `:telemetry` events. Attach the
-default logger in dev:
-
-```elixir
-# in MyApp.Application.start/2
-PhoenixExRatatui.Telemetry.attach_default_logger(level: :info)
-```
-
-Or wire `Telemetry.Metrics` for production dashboards:
-
-```elixir
-defmodule MyApp.Telemetry do
-  import Telemetry.Metrics
-
-  def metrics do
-    [
-      summary("phoenix_ex_ratatui.transport.connect.stop.duration",
-        unit: {:native, :millisecond}
-      ),
-      counter("phoenix_ex_ratatui.transport.disconnect"),
-      summary("phoenix_ex_ratatui.render.frame.stop.duration",
-        unit: {:native, :microsecond}
-      ),
-      counter("phoenix_ex_ratatui.input.forward")
-    ]
-  end
-end
-```
-
-See `PhoenixExRatatui.Telemetry`'s moduledoc for the full event
-catalogue.
+Both integrations emit the same `:telemetry` events, one layer above the events `ex_ratatui` already emits. Attach the default logger in dev with `PhoenixExRatatui.Telemetry.attach_default_logger(level: :info)`, or wire `Telemetry.Metrics` for production dashboards. The [Telemetry guide](telemetry.md) covers the full event tree, a `Telemetry.Metrics` example, and how the two event layers pair up.
 
 ## What about ANSI / xterm.js / a real terminal in a browser?
 

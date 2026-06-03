@@ -28,11 +28,16 @@ The [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/e
 
 | View | Route | Demonstrates |
 |------|-------|--------------|
-| Home | `/` | Full-page LiveView, callbacks runtime, navigation intents |
-| Chat | `/chat` | Markdown, Textarea, Throbber, a slash-command popup, and scrollback |
+| Home | `/` | Full-page LiveView, reducer runtime, navigation intents |
+| Chat | `/chat` | Full-page LiveView, callbacks runtime, Markdown/Textarea/Throbber/slash-command popup/scrollback |
 | Admin | `/admin` | An embedded reducer-runtime `LiveComponent` with a live Gauge/Table system monitor |
 
 Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
+
+## Ecosystem
+
+- [ex_ratatui](https://github.com/mcass19/ex_ratatui) — The core terminal UI library this builds on.
+- [kino_ex_ratatui](https://github.com/mcass19/kino_ex_ratatui) — Run TUIs inside [Livebook](https://livebook.dev) notebooks.
 
 ## Installation
 
@@ -222,12 +227,12 @@ end
 | Guide | Description |
 |-------|-------------|
 | [Getting Started](guides/getting_started.md) | Extended walkthrough of both the full-page and embedded APIs, the JS hook wiring, and the typical project structure |
+| [Telemetry](guides/telemetry.md) | `:telemetry` events for transport, render, input, and intents — logging and `Telemetry.Metrics` |
 
 Module references:
 
 - [`PhoenixExRatatui.LiveView`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveView.html) — the full-page macro
 - [`PhoenixExRatatui.LiveComponent`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.LiveComponent.html) — the embeddable macro
-- [`PhoenixExRatatui.Telemetry`](https://hexdocs.pm/phoenix_ex_ratatui/PhoenixExRatatui.Telemetry.html) — `:telemetry` events catalogue and `Telemetry.Metrics` wiring example
 
 ## Contributing
 
