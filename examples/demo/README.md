@@ -1,35 +1,21 @@
 # Demo — `phoenix_ex_ratatui`
 
-A minimal Phoenix app exercising both integration paths against the
-same `ExRatatui.App`:
+A Phoenix app showing the three integration shapes against real `ExRatatui.App`s, all sharing one violet `ExRatatui.Theme` palette.
 
-  * **`/counter`** — full-page TUI mounted via `tui_live` (one line
-    in the router; no wrapper module).
-  * **`/admin`** — embedded TUI inside a regular LiveView via
-    `PhoenixExRatatui.LiveComponent`. Same Counter App, alongside
-    a Phoenix-native heading and footer.
+  * **`/`** ([`HomeLive`](lib/demo_web/live/home_live.ex)) — full-page TUI, reducer runtime. Matrix-style digital rain (`Canvas`) under an `EX RATATUI` `BigText` title.
+  * **`/chat`** ([`ChatLive`](lib/demo_web/live/chat_live.ex)) — full-page TUI, callbacks runtime. A chat UI exercising most of the rich widget catalogue: `Markdown`, `Textarea`, `Throbber`, `Popup`, `WidgetList`, `SlashCommands`, `Scrollbar`.
+  * **`/admin`** ([`AdminLive`](lib/demo_web/live/admin_live.ex)) — a plain `Phoenix.LiveView` embedding a reducer-runtime `LiveComponent` ([`SystemMonitorPanel`](lib/demo_web/live/system_monitor_panel.ex): `Gauge`, `Table`, `/proc` stats) alongside Phoenix-native page chrome.
 
-Both pages drive `Demo.Counter`, an `ExRatatui.App` that paints a
-counter and increments it on `+`/`-` keypresses.
+Navigation between pages flows through runtime intents (`{:navigate, "/path"}`), dispatched by the macros into `push_navigate/2` and friends.
 
 ## Prerequisites
 
-  * Elixir 1.17+ / Erlang 26+
-  * Node.js 22+
-  * Sibling checkouts of `phoenix_ex_ratatui` and `ex_ratatui` next
-    to this `examples/demo/` directory:
-
-    ```
-    elixir/
-    ├── ex_ratatui/
-    ├── phoenix_ex_ratatui/
-    │   └── examples/
-    │       └── demo/         <- you are here
-    ```
+  * Elixir 1.17+ / Erlang 26+, Node.js 22+
+  * A sibling `phoenix_ex_ratatui` checkout next to `examples/demo/` (the `path` dep in `mix.exs`); `ex_ratatui` comes from Hex.
 
 ## Running
 
-From inside `examples/demo/`:
+From `examples/demo/`:
 
 ```sh
 mix deps.get
@@ -37,34 +23,16 @@ cd assets && npm install && cd ..
 mix phx.server
 ```
 
-Then open:
-
-  * <http://localhost:4000/counter> — full-page TUI via `tui_live`
-  * <http://localhost:4000/admin>   — TUI embedded as a LiveComponent
-
-Use **+** / **-** to change the counter, **q** to quit (the TUI's
-runtime exits cleanly; reload the page to mount fresh).
+Then open <http://localhost:4003>. Each view shows its key hints along the bottom.
 
 ## What to look at
 
-  * [`lib/demo/counter.ex`](lib/demo/counter.ex) — the `ExRatatui.App`. Note that nothing
-    here is Phoenix-aware. The same module would run unchanged
-    over SSH, in `kino_ex_ratatui`, or on a Nerves badge.
-  * [`lib/demo_web/router.ex`](lib/demo_web/router.ex) — `tui_live "/counter", Demo.Counter`
-    is the entire integration for the full-page route. The `/admin`
-    route maps to a hand-written LiveView so you can see the
-    LiveComponent in context.
-  * [`lib/demo_web/live/admin_live.ex`](lib/demo_web/live/admin_live.ex) — the LiveView that
-    embeds `PhoenixExRatatui.LiveComponent`. Renders surrounding
-    content alongside the TUI.
-  * [`assets/js/app.js`](assets/js/app.js) — the JS-hook wiring. One
-    `import` of the bundle from `deps/phoenix_ex_ratatui/`, one
-    entry in `LiveSocket`'s `hooks`, done.
+  * [`lib/demo_web/router.ex`](lib/demo_web/router.ex) — three `live/3` routes, one per integration shape.
+  * [`home_live.ex`](lib/demo_web/live/home_live.ex) and [`chat_live.ex`](lib/demo_web/live/chat_live.ex) — `use PhoenixExRatatui.LiveView`, on the reducer and callbacks runtimes respectively.
+  * [`system_monitor_panel.ex`](lib/demo_web/live/system_monitor_panel.ex) — `use PhoenixExRatatui.LiveComponent`, embedded by [`admin_live.ex`](lib/demo_web/live/admin_live.ex).
+  * [`lib/demo/`](lib/demo) — the Phoenix-agnostic pieces the views share: `MatrixRain` (pure rain model), `Theme` (the palette), `UI` (footer nav hints).
+  * [`assets/js/app.js`](assets/js/app.js) — the whole JS wiring: one import of the hook, one entry in `LiveSocket`'s `hooks`.
 
 ## Telemetry
 
-The application's `start/2` attaches the default logger so every
-`phoenix_ex_ratatui` event prints to the console at `:info` level.
-Open `iex -S mix phx.server` and use the page to see mount /
-render / disconnect events fly by — useful for verifying the
-integration end-to-end.
+`Demo.Application.start/2` carries a commented-out `PhoenixExRatatui.Telemetry.attach_default_logger/1` call — uncomment it to print every mount / render / disconnect event to stdout.
