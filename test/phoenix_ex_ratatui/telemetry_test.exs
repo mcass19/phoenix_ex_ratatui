@@ -24,8 +24,6 @@ defmodule PhoenixExRatatui.TelemetryTest do
   # per-test marker metadata — would complicate every assertion.
   use ExUnit.Case, async: false
 
-  require Logger
-
   alias PhoenixExRatatui.Telemetry
   alias PhoenixExRatatui.TestApp
   alias PhoenixExRatatui.Transport
