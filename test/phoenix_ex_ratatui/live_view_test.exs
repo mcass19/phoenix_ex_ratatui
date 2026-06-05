@@ -83,6 +83,36 @@ defmodule PhoenixExRatatui.LiveViewTest do
       :code.purge(module_name)
       :code.delete(module_name)
     end
+
+    test "__using__ macro body is invoked for the reducer runtime when expanded at runtime" do
+      # Same rationale as the callbacks case above, for `runtime:
+      # :reducer`: the reducer proxy body (proxy_body(:reducer, _)) is
+      # assembled by the @after_compile hook at compile time, which cover
+      # doesn't track. Expanding the macro from a runtime test runs that
+      # branch while cover is active so it gets tracked. Without this the
+      # reducer `quote` line shows up as uncovered.
+      module_name =
+        String.to_atom("Elixir.PhoenixExRatatui.LiveViewTest.RuntimeReducerMacroTest")
+
+      Code.eval_string("""
+      defmodule #{inspect(module_name)} do
+        use PhoenixExRatatui.LiveView, runtime: :reducer
+      end
+      """)
+
+      assert Code.ensure_loaded?(module_name)
+      runtime = Module.concat(module_name, "Runtime")
+      assert Code.ensure_loaded?(runtime)
+      assert runtime.__runtime__() == :reducer
+      assert function_exported?(runtime, :init, 1)
+      assert function_exported?(runtime, :update, 2)
+      assert function_exported?(runtime, :subscriptions, 1)
+
+      :code.purge(runtime)
+      :code.delete(runtime)
+      :code.purge(module_name)
+      :code.delete(module_name)
+    end
   end
 
   describe "__define_runtime__/2 (proxy generation, callbacks runtime)" do
