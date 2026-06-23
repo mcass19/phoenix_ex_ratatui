@@ -44,7 +44,8 @@ defmodule PhoenixExRatatui.LiveComponent do
 
   ## TUI callbacks
 
-  Same as `PhoenixExRatatui.LiveView`:
+  The App-level `tui_*` callbacks are the same as
+  `PhoenixExRatatui.LiveView`:
 
     * `tui_mount/1`, `tui_render/2`, `tui_handle_event/2`,
       `tui_handle_info/2`, `tui_terminate/2`, `tui_mount_opts/1`
@@ -52,13 +53,25 @@ defmodule PhoenixExRatatui.LiveComponent do
   See `PhoenixExRatatui.LiveView`'s moduledoc for full callback
   semantics.
 
+  Two extra hooks are LiveComponent-specific, for your own *component*
+  logic (distinct from the App-level callbacks above):
+
+    * `tui_update/2` — `(assigns, socket)`, the parent's assigns for this
+      component. Default `{:ok, assign(socket, assigns)}`. The library
+      owns `update/2` to keep the render path intact, so override this
+      instead of `update/2`.
+    * `tui_component_event/3` — `(event, params, socket)`, for the
+      component's own `phx-click`s and similar. Default `{:noreply,
+      socket}`. The library owns `handle_event/3` for the TUI's input, so
+      override this instead of `handle_event/3`.
+
   ## Threading parent assigns into the App
 
-  The component's `update/2` receives assigns from the parent LV.
-  Override `tui_mount_opts/1` (which gets the component socket) to
-  thread them into `tui_mount/1`:
+  Override `tui_update/2` to capture the parent's assigns, then
+  `tui_mount_opts/1` (which gets the component socket) to thread them
+  into `tui_mount/1`:
 
-      def update(assigns, socket) do
+      def tui_update(assigns, socket) do
         {:ok, assign(socket, assigns)}
       end
 
@@ -148,6 +161,24 @@ defmodule PhoenixExRatatui.LiveComponent do
       # ----- TUI callback defaults (all overridable) -----
       unquote(tui_defaults)
 
+      # LiveComponents have no lifecycle hooks (unlike PhoenixExRatatui.LiveView),
+      # so the library must keep owning update/2 and handle_event/3 to protect
+      # its render/input wiring. A user's own component update/event logic goes
+      # in these socket-level hooks instead — distinct from the App-level
+      # tui_* callbacks above (e.g. tui_handle_event/2 takes (event, state);
+      # tui_component_event/3 takes (event, params, socket)).
+      @doc false
+      def tui_update(assigns, socket) do
+        {:ok, Phoenix.Component.assign(socket, assigns)}
+      end
+
+      @doc false
+      def tui_component_event(_event, _params, socket) do
+        {:noreply, socket}
+      end
+
+      defoverridable tui_update: 2, tui_component_event: 3
+
       # ----- Phoenix.LiveComponent callbacks -----
 
       @impl Phoenix.LiveComponent
@@ -175,8 +206,10 @@ defmodule PhoenixExRatatui.LiveComponent do
         {:ok, PhoenixExRatatui.LiveComponent.__push_render__(socket, diff)}
       end
 
+      # Non-render assigns from the parent flow to the overridable
+      # tui_update/2 hook (default: assign them, the previous behaviour).
       def update(assigns, socket) do
-        {:ok, Phoenix.Component.assign(socket, assigns)}
+        tui_update(assigns, socket)
       end
 
       @impl Phoenix.LiveComponent
@@ -214,7 +247,13 @@ defmodule PhoenixExRatatui.LiveComponent do
         {:noreply, PhoenixExRatatui.LiveComponent.__handle_input__(socket, payload)}
       end
 
-      defoverridable mount: 1, update: 2, render: 1, handle_event: 3
+      # Any other event is the component's own (a phx-click, etc.) and
+      # flows to the overridable tui_component_event/3 hook.
+      def handle_event(event, params, socket) do
+        tui_component_event(event, params, socket)
+      end
+
+      defoverridable mount: 1, render: 1
 
       @after_compile {PhoenixExRatatui.LiveView, :__define_runtime__}
     end

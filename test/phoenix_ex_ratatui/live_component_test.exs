@@ -19,6 +19,7 @@ defmodule PhoenixExRatatui.LiveComponentTest do
   alias ExRatatui.CellSession
   alias PhoenixExRatatui.FailingTestComponent
   alias PhoenixExRatatui.LiveComponent, as: PXRLC
+  alias PhoenixExRatatui.TestCallbacksComponent
   alias PhoenixExRatatui.TestComponent
   alias PhoenixExRatatui.TestParentLive
 
@@ -230,6 +231,54 @@ defmodule PhoenixExRatatui.LiveComponentTest do
       html = render(view)
       assert html =~ "TUI error:"
       assert html =~ "session closed"
+    end
+  end
+
+  describe "component-level hooks (tui_update/2, tui_component_event/3)" do
+    test "a non-TUI event flows to the default tui_component_event/3 (no-op, no render)" do
+      {:ok, view, _html} = live_isolated(build_conn(), TestParentLive)
+
+      view
+      |> element("#embedded-tui")
+      |> render_hook("phx_ex_ratatui:resize", %{"cols" => 4, "rows" => 1})
+
+      assert_push_event(view, "phx_ex_ratatui:render", _initial, 1000)
+
+      # TestComponent doesn't override tui_component_event, so the library
+      # default no-op runs — the event is harmless and produces no frame.
+      view
+      |> element("#embedded-tui")
+      |> render_hook("user:click", %{})
+
+      refute_push_event(view, "phx_ex_ratatui:render", 100)
+    end
+
+    test "a component overriding both hooks sees them fire while the TUI keeps working" do
+      session = %{"component" => TestCallbacksComponent}
+      {:ok, view, _html} = live_isolated(build_conn(), TestParentLive, session: session)
+
+      # tui_update ran on the initial parent-assigns update/2.
+      assert component_assigns(view, "embedded-tui").tui_update_ran == true
+
+      view
+      |> element("#embedded-tui")
+      |> render_hook("phx_ex_ratatui:resize", %{"cols" => 8, "rows" => 1})
+
+      assert_push_event(view, "phx_ex_ratatui:render", _initial, 1000)
+
+      # The component's own event hook runs for a non-TUI event.
+      view
+      |> element("#embedded-tui")
+      |> render_hook("user:click", %{})
+
+      assert component_assigns(view, "embedded-tui").component_event_ran == true
+
+      # The TUI still re-renders on input.
+      view
+      |> element("#embedded-tui")
+      |> render_hook("phx_ex_ratatui:input", %{"kind" => "key", "code" => "x", "modifiers" => []})
+
+      assert_push_event(view, "phx_ex_ratatui:render", _payload, 1000)
     end
   end
 
