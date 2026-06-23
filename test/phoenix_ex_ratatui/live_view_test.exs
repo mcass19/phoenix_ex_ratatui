@@ -23,6 +23,7 @@ defmodule PhoenixExRatatui.LiveViewTest do
   alias ExRatatui.CellSession
   alias PhoenixExRatatui.FailingTestLive
   alias PhoenixExRatatui.LiveView, as: PXRLV
+  alias PhoenixExRatatui.TestCallbacksLive
   alias PhoenixExRatatui.TestLive
 
   doctest PhoenixExRatatui.LiveView
@@ -458,9 +459,111 @@ defmodule PhoenixExRatatui.LiveViewTest do
     end
   end
 
+  describe "lifecycle hooks (__event_hook__/4, __info_hook__/3)" do
+    # The hooks consume only the library's own traffic and pass
+    # everything else through, which is what lets a user define their
+    # own handle_event/3 and handle_info/2 (the integration block below).
+
+    test "the event hook passes non-TUI events through to the user's handle_event/3" do
+      socket = build_socket(%{})
+      assert {:cont, ^socket} = PXRLV.__event_hook__(TestLive, "user:click", %{}, socket)
+    end
+
+    test "the event hook consumes input and drops it before a transport exists" do
+      socket = build_socket(%{tui: nil})
+
+      assert {:halt, ^socket} =
+               PXRLV.__event_hook__(
+                 TestLive,
+                 "phx_ex_ratatui:input",
+                 %{"kind" => "key", "code" => "a", "modifiers" => []},
+                 socket
+               )
+    end
+
+    test "the info hook passes unrelated messages through to the user's handle_info/2" do
+      socket = build_socket(%{})
+      assert {:cont, ^socket} = PXRLV.__info_hook__(TestLive.Runtime, {:user_msg, :hi}, socket)
+    end
+
+    test "the info hook passes through an EXIT from a process that isn't our server" do
+      socket = build_socket(%{tui: %{server: self(), cell_session: :ref, mod: TestLive.Runtime}})
+      stranger = spawn(fn -> :ok end)
+
+      assert {:cont, ^socket} =
+               PXRLV.__info_hook__(TestLive.Runtime, {:EXIT, stranger, :boom}, socket)
+    end
+
+    test "the info hook consumes our runtime server's EXIT and ends the session" do
+      server = self()
+
+      socket =
+        build_socket(%{
+          tui: %{server: server, cell_session: :ref, mod: TestLive.Runtime},
+          tui_ended: false
+        })
+
+      assert {:halt, result} =
+               PXRLV.__info_hook__(TestLive.Runtime, {:EXIT, server, :normal}, socket)
+
+      assert result.assigns.tui == nil
+      assert result.assigns.tui_ended == true
+    end
+  end
+
+  describe "user-defined LiveView callbacks coexist with the TUI" do
+    test "a user's own handle_event/3 runs while TUI input still renders" do
+      {:ok, view, _html} = live_isolated(build_conn(), TestCallbacksLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{"cols" => 10, "rows" => 1})
+      assert_push_event(view, "phx_ex_ratatui:render", _initial, 1000)
+
+      # Not a TUI event, so the hook passes it through to handle_event/3.
+      render_hook(view, "user:click", %{})
+      assert :sys.get_state(view.pid).socket.assigns.user_clicked == true
+
+      # The TUI keeps working: an input event still drives a re-render.
+      render_hook(view, "phx_ex_ratatui:input", %{
+        "kind" => "key",
+        "code" => "x",
+        "modifiers" => []
+      })
+
+      assert_push_event(view, "phx_ex_ratatui:render", _payload, 1000)
+    end
+
+    test "a user's own handle_info/2 runs while TUI render messages still flow" do
+      {:ok, view, _html} = live_isolated(build_conn(), TestCallbacksLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{"cols" => 10, "rows" => 1})
+      assert_push_event(view, "phx_ex_ratatui:render", _initial, 1000)
+
+      # A message only the user's handle_info/2 matches.
+      send(view.pid, {:user_msg, :hello})
+      assert_assigns_eventually(view, fn assigns -> assigns[:user_msg] == :hello end)
+
+      # The render path (also a handle_info message) is still consumed by
+      # the hook, so input keeps re-rendering.
+      render_hook(view, "phx_ex_ratatui:input", %{
+        "kind" => "key",
+        "code" => "x",
+        "modifiers" => []
+      })
+
+      assert_push_event(view, "phx_ex_ratatui:render", _payload, 1000)
+    end
+  end
+
   # ----------------------------------------------------------------------
   # Helpers
   # ----------------------------------------------------------------------
+
+  defp build_socket(assigns) do
+    %Phoenix.LiveView.Socket{
+      endpoint: PhoenixExRatatui.TestEndpoint,
+      assigns: Map.merge(%{__changed__: %{}}, assigns)
+    }
+  end
 
   defp assert_assigns_eventually(view, predicate, timeout_ms \\ 1000) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms

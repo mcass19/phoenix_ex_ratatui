@@ -90,20 +90,24 @@ defmodule PhoenixExRatatui.LiveView do
   - **WebSocket mount** — `Process.flag(:trap_exit, true)` so a
     mount-failing TUI returns `{:error, _}` cleanly from
     `Transport.start_link/1` instead of killing the LV (which would
-    trigger an infinite client reconnect loop).
+    trigger an infinite client reconnect loop). Also attaches the
+    library's `:handle_event` / `:handle_info` lifecycle hooks (see
+    `__attach_hooks__/3`).
   - **First `phx_ex_ratatui:resize`** — call `tui_mount_opts/1`, start
     the Transport at `{cols, rows}` driving the generated `Runtime`
     proxy.
   - **Subsequent resizes** — `Transport.resize/3` updates the
     `CellSession` and notifies the runtime.
-  - **Hook input** — decoded into an `%ExRatatui.Event.Key{}` and
-    forwarded via `Transport.push_event/2`.
-  - **Runtime emits a frame** — encoded via
-    `PhoenixExRatatui.Renderer.Html.encode_diff/1` and pushed as
-    a `phx_ex_ratatui:render` event.
-  - **Runtime exits** (App returned `{:stop, _}`, or crash) — we get
-    an EXIT signal, null out `:tui`, set `:tui_ended` so the user
-    sees a refresh prompt instead of a frozen-cells display.
+  - **Hook input** — the `:handle_event` hook decodes it into an
+    `%ExRatatui.Event.Key{}` and forwards it via `Transport.push_event/2`.
+  - **Runtime emits a frame** — the `:handle_info` hook encodes it via
+    `PhoenixExRatatui.Renderer.Html.encode_diff/1` and pushes a
+    `phx_ex_ratatui:render` event.
+  - **Runtime exits** (App returned `{:stop, _}`, or crash) — the
+    `:handle_info` hook gets the server's EXIT signal, nulls out `:tui`,
+    sets `:tui_ended` so the user sees a refresh prompt instead of a
+    frozen-cells display. EXITs from any other process pass through to
+    the user's own `handle_info/2`.
 
   ## Options
 
@@ -120,19 +124,32 @@ defmodule PhoenixExRatatui.LiveView do
       `tui_handle_info/2` quartet. See
       [ExRatatui.App](`ExRatatui.App`) for the runtime distinction.
 
-  ## Customising LiveView callbacks
+  ## Defining your own LiveView callbacks
 
-  All LiveView callbacks (`mount/3`, `render/1`, `handle_event/3`,
-  `handle_info/2`) are `defoverridable` — wrap any of them and
-  call `super(...)`:
+  `mount/3` and `render/1` are `defoverridable` — wrap either and call
+  `super(...)`:
 
       def mount(params, session, socket) do
         {:ok, socket} = super(params, session, socket)
         {:ok, assign(socket, :title, "My TUI")}
       end
 
-  For mixed pages where the TUI is one of several pieces of UI,
-  reach for `PhoenixExRatatui.LiveComponent` instead.
+  `handle_event/3` and `handle_info/2` are **not** injected, so define
+  them normally. The library consumes its own browser events
+  (`phx_ex_ratatui:*`) and internal messages (`{:phoenix_ex_ratatui, …}`,
+  the runtime server's `{:EXIT, …}`) through `Phoenix.LiveView` lifecycle
+  hooks attached in `mount/3`. Those hooks run first and pass everything
+  else through, so your own `phx-click` handlers, PubSub, and timers
+  coexist with the TUI — no `super`, no special callback names:
+
+      def handle_info({:new_message, msg}, socket) do
+        # the TUI's render messages are consumed by the hook before this
+        # runs; here you only see your own messages
+        {:noreply, assign(socket, :latest, msg)}
+      end
+
+  For mixed pages where the TUI is one of several pieces of UI, reach for
+  `PhoenixExRatatui.LiveComponent` instead.
   """
 
   alias ExRatatui.Event.Key
@@ -209,11 +226,24 @@ defmodule PhoenixExRatatui.LiveView do
 
       @impl Phoenix.LiveView
       def mount(_params, _session, socket) do
-        if Phoenix.LiveView.connected?(socket) do
-          # Without trap_exit a mount-failing TUI app would kill the LV
-          # and infinite-reconnect from the client.
-          Process.flag(:trap_exit, true)
-        end
+        socket =
+          if Phoenix.LiveView.connected?(socket) do
+            # Without trap_exit a mount-failing TUI app would kill the LV
+            # and infinite-reconnect from the client.
+            Process.flag(:trap_exit, true)
+
+            # Intercept only the library's own events/messages through
+            # lifecycle hooks, so a user's own handle_event/3 and
+            # handle_info/2 (phx-clicks, PubSub, …) coexist with the TUI
+            # without colliding. See `__attach_hooks__/3`.
+            PhoenixExRatatui.LiveView.__attach_hooks__(
+              socket,
+              __MODULE__,
+              @phoenix_ex_ratatui_runtime_mod
+            )
+          else
+            socket
+          end
 
         socket =
           socket
@@ -250,35 +280,15 @@ defmodule PhoenixExRatatui.LiveView do
         """
       end
 
-      @impl Phoenix.LiveView
-      def handle_event(
-            "phx_ex_ratatui:resize",
-            %{"cols" => cols, "rows" => rows},
-            socket
-          )
-          when is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
-        {:noreply, PhoenixExRatatui.LiveView.__handle_resize__(socket, __MODULE__, cols, rows)}
-      end
-
-      def handle_event("phx_ex_ratatui:input", payload, socket) when is_map(payload) do
-        {:noreply, PhoenixExRatatui.LiveView.__handle_input__(socket, payload)}
-      end
-
-      @impl Phoenix.LiveView
-      def handle_info({:phoenix_ex_ratatui, :render, diff}, socket) do
-        {:noreply,
-         PhoenixExRatatui.LiveView.__push_render__(socket, @phoenix_ex_ratatui_runtime_mod, diff)}
-      end
-
-      def handle_info({:phoenix_ex_ratatui, :intent, intent}, socket) do
-        {:noreply, PhoenixExRatatui.LiveView.__handle_intent__(socket, intent)}
-      end
-
-      def handle_info({:EXIT, server_pid, _reason}, socket) do
-        {:noreply, PhoenixExRatatui.LiveView.__handle_server_exit__(socket, server_pid)}
-      end
-
-      defoverridable mount: 3, render: 1, handle_event: 3, handle_info: 2
+      # The library's own browser events (`phx_ex_ratatui:input` /
+      # `:resize`) and internal messages (`{:phoenix_ex_ratatui, …}`,
+      # the runtime server's `{:EXIT, …}`) are handled by lifecycle
+      # hooks attached in `mount/3` (see `__attach_hooks__/3`), not by
+      # injected `handle_event/3` / `handle_info/2` clauses. That keeps
+      # those callbacks free for the user to define normally — the hooks
+      # consume only the library's traffic and pass everything else
+      # through.
+      defoverridable mount: 3, render: 1
 
       # Generates the sibling `__MODULE__.Runtime` proxy that conforms
       # to `ExRatatui.App` by delegating to this module's `tui_*`
@@ -413,6 +423,61 @@ defmodule PhoenixExRatatui.LiveView do
         do: unquote(user_mod).tui_terminate(reason, state)
     end
   end
+
+  @doc false
+  # Attaches the library's lifecycle hooks to a connected socket. The
+  # closures capture the user module (for resize → mount-opts) and the
+  # generated runtime module (for render telemetry), so the hook bodies
+  # stay plain, testable functions.
+  def __attach_hooks__(socket, user_mod, runtime_mod) do
+    socket
+    |> Phoenix.LiveView.attach_hook(
+      :phoenix_ex_ratatui_events,
+      :handle_event,
+      fn event, params, socket -> __event_hook__(user_mod, event, params, socket) end
+    )
+    |> Phoenix.LiveView.attach_hook(
+      :phoenix_ex_ratatui_messages,
+      :handle_info,
+      fn msg, socket -> __info_hook__(runtime_mod, msg, socket) end
+    )
+  end
+
+  @doc false
+  # `:handle_event` hook. Halts on the two browser events the JS hook
+  # emits; lets everything else through to the user's own handle_event/3.
+  def __event_hook__(user_mod, "phx_ex_ratatui:resize", %{"cols" => cols, "rows" => rows}, socket)
+      when is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
+    {:halt, __handle_resize__(socket, user_mod, cols, rows)}
+  end
+
+  def __event_hook__(_user_mod, "phx_ex_ratatui:input", payload, socket) when is_map(payload) do
+    {:halt, __handle_input__(socket, payload)}
+  end
+
+  def __event_hook__(_user_mod, _event, _params, socket), do: {:cont, socket}
+
+  @doc false
+  # `:handle_info` hook. Halts on the library's render/intent messages
+  # and on the runtime server's own EXIT; lets other messages (the
+  # user's PubSub, their own linked-process EXITs, …) through.
+  def __info_hook__(runtime_mod, {:phoenix_ex_ratatui, :render, diff}, socket) do
+    {:halt, __push_render__(socket, runtime_mod, diff)}
+  end
+
+  def __info_hook__(_runtime_mod, {:phoenix_ex_ratatui, :intent, intent}, socket) do
+    {:halt, __handle_intent__(socket, intent)}
+  end
+
+  def __info_hook__(_runtime_mod, {:EXIT, server_pid, _reason}, socket) do
+    if match?(%{server: ^server_pid}, socket.assigns[:tui]) do
+      {:halt, __handle_server_exit__(socket, server_pid)}
+    else
+      {:cont, socket}
+    end
+  end
+
+  def __info_hook__(_runtime_mod, _msg, socket), do: {:cont, socket}
 
   @doc false
   def __handle_resize__(socket, user_mod, cols, rows) do
