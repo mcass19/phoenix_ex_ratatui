@@ -67,7 +67,7 @@ defmodule PhoenixExRatatui do
   Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
 
   ```elixir
-  {:phoenix_ex_ratatui, "~> 0.1"}
+  {:phoenix_ex_ratatui, "~> 0.2"}
   ```
 
   It pulls in `ex_ratatui` (`~> 0.10`) transitively, which ships a

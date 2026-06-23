@@ -13,7 +13,7 @@ defp deps do
     # …
     {:phoenix, "~> 1.7"},
     {:phoenix_live_view, "~> 1.1"},
-    {:phoenix_ex_ratatui, "~> 0.1"}
+    {:phoenix_ex_ratatui, "~> 0.2"}
   ]
 end
 ```

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-23
+
 ### Fixed
 
 - **Defining your own `handle_event/3` or `handle_info/2` no longer breaks the TUI.** Previously the macros injected those callbacks as `defoverridable`, so a host module that defined its own clause (a `phx-click`, a PubSub subscription, a timer) silently replaced the library's `phx_ex_ratatui:input` / `phx_ex_ratatui:render` handling — input or rendering would stop while the rest of the page kept working, with no error. `PhoenixExRatatui.LiveView` now intercepts only its own events and messages through `Phoenix.LiveView` lifecycle hooks (`attach_hook/4`) attached in `mount/3`, passing everything else through to your callbacks. They coexist with the TUI with no `super` and no special wiring.
@@ -69,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[Getting Started guide](guides/getting_started.md)** walking through both unified-module APIs, the JS hook wiring, and the typical project structure. **[Examples directory](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo)** ships a minimal Phoenix app under `examples/demo/` that demonstrates the unified LV and LC side-by-side — useful as a copy-paste starting point for new integrations.
 
-[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.1...0.2.0
 [0.1.1]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.0...0.1.1
 [0.1.0]: https://github.com/mcass19/phoenix_ex_ratatui/releases/tag/v0.1.0
