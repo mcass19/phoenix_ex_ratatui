@@ -13,17 +13,20 @@ defmodule DemoWeb.Router do
   scope "/", DemoWeb do
     pipe_through(:browser)
 
-    # Three views — three different integration shapes:
+    # Four views — different integration shapes:
     #
-    # /        landing TUI (full-page LV, callbacks runtime)
-    # /chat    rich-widget chat (full-page LV, callbacks runtime)
-    # /admin   plain LV embedding a reducer-runtime LiveComponent
+    # /              landing TUI (full-page LV, callbacks runtime)
+    # /chat          rich-widget chat (full-page LV, callbacks runtime)
+    # /admin         plain LV embedding a reducer-runtime LiveComponent
+    # /coexistence   full-page TUI LV that ALSO defines its own
+    #                handle_event/3 + handle_info/2 (HTML toolbar)
     #
-    # All inter-page navigation flows through `phoenix_ex_ratatui`'s
+    # Most inter-page navigation flows through `phoenix_ex_ratatui`'s
     # runtime intents (`{:navigate, "/path"}` etc.), dispatched by
     # the LV macro into `Phoenix.LiveView.push_navigate/2` and friends.
     live("/", HomeLive)
     live("/chat", ChatLive)
     live("/admin", AdminLive)
+    live("/coexistence", CoexistenceLive)
   end
 end
