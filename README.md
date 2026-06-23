@@ -95,6 +95,8 @@ The hook sets sensible defaults on the container (monospace font, `white-space: 
 
 Both shapes are **unified modules** — the same module is both a Phoenix LiveView/LiveComponent and the `ExRatatui.App` driving it. The macro auto-generates a hidden `Module.Runtime` proxy that conforms to `ExRatatui.App` by delegating to the `tui_*` callbacks.
 
+> The TUI runs on the `tui_`-prefixed callbacks (`tui_handle_event/2`, `tui_render/2`, …). Plain `handle_event/3` / `handle_info/2` are your page's own LiveView callbacks — define them freely for `phx-click`s, PubSub, and timers; they coexist with the TUI. See [Defining your own page callbacks](guides/getting_started.md#defining-your-own-page-callbacks).
+
 ### Full-page TUI route
 
 ```elixir

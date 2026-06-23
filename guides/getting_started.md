@@ -62,7 +62,11 @@ The macro doesn't fight Phoenix's `handle_info/2` callback (which takes a socket
 | `tui_terminate(reason, state)` | Cleanup on shutdown | `:ok` |
 | `tui_mount_opts(socket)` | Bridge socket assigns into `tui_mount/1` | `[]` |
 
-All are overridable; implement only what's needed. Phoenix's regular LV/LC callbacks (`mount/3`, `render/1`, `handle_event/3`, etc.) remain available and overridable through the same `defoverridable` mechanism.
+All are overridable; implement only what's needed.
+
+> #### Your TUI logic lives in the `tui_*` callbacks {: .warning}
+>
+> The TUI runs on the `tui_`-prefixed callbacks above. The plain Phoenix callbacks of the same name are **your page's own**, not the TUI's — the most common slip is writing `handle_event/3` (or the App's `handle_event/2`) expecting it to handle TUI keys, when that's `tui_handle_event/2`. `mount/3` and `render/1` are overridable (wrap them and call `super`); `handle_event/3` and `handle_info/2` are yours to define freely and coexist with the TUI (see [Defining your own page callbacks](#defining-your-own-page-callbacks)).
 
 ## Two ways to mount a TUI
 
@@ -181,6 +185,34 @@ end
 ```
 
 The TUI's diff stream routes through `Phoenix.LiveView.send_update/3` into the component's `update/2` (LiveComponents have no `handle_info` — they share the parent LV's process). Everything else is identical to the full-page path.
+
+## Defining your own page callbacks
+
+A TUI LiveView is still a LiveView, and a TUI LiveComponent is still a LiveComponent — so each can have its own callbacks for the parts of the page that aren't the TUI. The library consumes its own browser events (`phx_ex_ratatui:*`) and render messages through `Phoenix.LiveView` lifecycle hooks before your callbacks run, so they coexist with the TUI automatically — no `super`, no special wiring:
+
+```elixir
+defmodule MyAppWeb.DashboardTui do
+  use PhoenixExRatatui.LiveView
+
+  # … tui_mount/1, tui_render/2, tui_handle_event/2 …
+
+  # Your own LiveView callbacks, alongside the TUI:
+  def handle_event("toggle-theme", _params, socket) do
+    {:noreply, assign(socket, :dark, !socket.assigns.dark)}
+  end
+
+  def handle_info(:tick, socket) do
+    Process.send_after(self(), :tick, 1_000)
+    {:noreply, assign(socket, :clock, Time.utc_now())}
+  end
+end
+```
+
+On a `LiveComponent`, the framework gives it no `handle_info` and no lifecycle hooks, so the library keeps owning `update/2` and `handle_event/3`. Define your component's own logic in the overridable hooks instead: `tui_update/2` (the parent's assigns; default assigns them) and `tui_component_event/3` (the component's own `phx-click`s).
+
+> #### Feeding PubSub into the TUI {: .tip}
+>
+> To drive the *TUI itself* from PubSub (a chat room, live metrics), subscribe in `tui_mount/1` and handle the broadcast in `tui_handle_info/2` — both run in the TUI runtime process, so the message reaches your App state and triggers a re-render. Use the LiveView's own `handle_info/2` only for page-level concerns outside the TUI.
 
 ## Inter-page navigation
 
