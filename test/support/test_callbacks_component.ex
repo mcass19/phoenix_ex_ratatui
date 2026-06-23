@@ -1,9 +1,9 @@
 defmodule PhoenixExRatatui.TestCallbacksComponent do
   @moduledoc """
   Fixture proving a LiveComponent's own socket-level hooks
-  (`tui_update/2`, `tui_component_event/3`) fire and coexist with the
-  TUI after the delegation refactor. Records that each hook ran in
-  assigns the test reads via the parent LV's component registry.
+  (`tui_component_update/2`, `tui_component_event/3`) fire and coexist
+  with the TUI after the delegation refactor. Records that each hook ran
+  in assigns the test reads via the parent LV's component registry.
   """
   use PhoenixExRatatui.LiveComponent
 
@@ -19,11 +19,11 @@ defmodule PhoenixExRatatui.TestCallbacksComponent do
   def tui_handle_event(_event, state), do: {:noreply, %{state | n: state.n + 1}}
 
   # The component's own socket-level hooks, defined normally.
-  def tui_update(assigns, socket) do
+  def tui_component_update(assigns, socket) do
     {:ok,
      socket
      |> Phoenix.Component.assign(assigns)
-     |> Phoenix.Component.assign(:tui_update_ran, true)}
+     |> Phoenix.Component.assign(:tui_component_update_ran, true)}
   end
 
   def tui_component_event("user:click", _params, socket) do

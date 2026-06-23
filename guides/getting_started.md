@@ -208,7 +208,7 @@ defmodule MyAppWeb.DashboardTui do
 end
 ```
 
-On a `LiveComponent`, the framework gives it no `handle_info` and no lifecycle hooks, so the library keeps owning `update/2` and `handle_event/3`. Define your component's own logic in the overridable hooks instead: `tui_update/2` (the parent's assigns; default assigns them) and `tui_component_event/3` (the component's own `phx-click`s).
+On a `LiveComponent`, the framework gives it no `handle_info` and no lifecycle hooks, so the library keeps owning `update/2` and `handle_event/3`. Define your component's own logic in the overridable hooks instead: `tui_component_update/2` (the parent's assigns; default assigns them) and `tui_component_event/3` (the component's own `phx-click`s). They're named distinctly so they never collide with the App-level callbacks (e.g. the reducer runtime's `tui_update/2`).
 
 > #### Feeding PubSub into the TUI {: .tip}
 >

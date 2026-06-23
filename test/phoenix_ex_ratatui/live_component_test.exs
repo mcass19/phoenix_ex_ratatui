@@ -22,6 +22,7 @@ defmodule PhoenixExRatatui.LiveComponentTest do
   alias PhoenixExRatatui.TestCallbacksComponent
   alias PhoenixExRatatui.TestComponent
   alias PhoenixExRatatui.TestParentLive
+  alias PhoenixExRatatui.TestReducerComponent
 
   @endpoint PhoenixExRatatui.TestEndpoint
 
@@ -234,7 +235,7 @@ defmodule PhoenixExRatatui.LiveComponentTest do
     end
   end
 
-  describe "component-level hooks (tui_update/2, tui_component_event/3)" do
+  describe "component-level hooks (tui_component_update/2, tui_component_event/3)" do
     test "a non-TUI event flows to the default tui_component_event/3 (no-op, no render)" do
       {:ok, view, _html} = live_isolated(build_conn(), TestParentLive)
 
@@ -257,8 +258,8 @@ defmodule PhoenixExRatatui.LiveComponentTest do
       session = %{"component" => TestCallbacksComponent}
       {:ok, view, _html} = live_isolated(build_conn(), TestParentLive, session: session)
 
-      # tui_update ran on the initial parent-assigns update/2.
-      assert component_assigns(view, "embedded-tui").tui_update_ran == true
+      # tui_component_update ran on the initial parent-assigns update/2.
+      assert component_assigns(view, "embedded-tui").tui_component_update_ran == true
 
       view
       |> element("#embedded-tui")
@@ -279,6 +280,30 @@ defmodule PhoenixExRatatui.LiveComponentTest do
       |> render_hook("phx_ex_ratatui:input", %{"kind" => "key", "code" => "x", "modifiers" => []})
 
       assert_push_event(view, "phx_ex_ratatui:render", _payload, 1000)
+    end
+  end
+
+  describe "reducer runtime: tui_update/2 App callback vs tui_component_update/2 hook" do
+    # Regression guard: the reducer runtime's App callback is named
+    # tui_update/2 (msg, state). The LiveComponent assigns hook must use a
+    # different name, or update(assigns, socket) would dispatch the parent's
+    # assigns map into the reducer tui_update and crash with no clause.
+
+    test "update/2 with parent assigns reaches tui_component_update, not the reducer tui_update" do
+      socket = %Phoenix.LiveView.Socket{
+        endpoint: PhoenixExRatatui.TestEndpoint,
+        assigns: %{__changed__: %{}}
+      }
+
+      assert {:ok, updated} = TestReducerComponent.update(%{some: :assign}, socket)
+      assert updated.assigns.some == :assign
+    end
+
+    test "the reducer tui_update/2 App callback still drives state from events" do
+      assert TestReducerComponent.Runtime.update(
+               {:event, %ExRatatui.Event.Key{code: "x"}},
+               %{n: 0}
+             ) == {:noreply, %{n: 1}}
     end
   end
 

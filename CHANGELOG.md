@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **LiveView: `handle_event/3` and `handle_info/2` are no longer injected by the macro.** Define them normally — the lifecycle hooks above handle the TUI's own traffic. Only `mount/3` and `render/1` remain `defoverridable`. **Migration:** if you previously overrode `handle_event/3` or `handle_info/2` and called `super(...)`, remove the `super` delegation — there is no longer a macro-defined clause to delegate to; write your clauses directly.
-- **LiveComponent: define component-level logic in `tui_update/2` and `tui_component_event/3`.** LiveComponents have no lifecycle hooks, so the library keeps owning `update/2` and `handle_event/3` (the render and input wiring) and delegates everything else to these two overridable hooks (`tui_update/2` defaults to assigning the parent's assigns; `tui_component_event/3` to `{:noreply, socket}`). Override these instead of `update/2` / `handle_event/3`, which are no longer `defoverridable`.
+- **LiveComponent: define component-level logic in `tui_component_update/2` and `tui_component_event/3`.** LiveComponents have no lifecycle hooks, so the library keeps owning `update/2` and `handle_event/3` (the render and input wiring) and delegates everything else to these two overridable hooks (`tui_component_update/2` defaults to assigning the parent's assigns; `tui_component_event/3` to `{:noreply, socket}`). Override these instead of `update/2` / `handle_event/3`, which are no longer `defoverridable`. The names are deliberately distinct from the App-level callbacks so they don't collide with the reducer runtime's `tui_update/2`.
 
 ## [0.1.1] - 2026-06-03
 
