@@ -301,7 +301,7 @@ defmodule DemoWeb.ChatLive do
   # — even if the popup logic somehow lost the selection.
   def tui_handle_event(%Key{code: "enter", modifiers: mods}, state) do
     cond do
-      :shift in mods ->
+      "shift" in mods ->
         ExRatatui.textarea_handle_key(state.textarea, "enter", [])
         {:noreply, state}
 
@@ -339,16 +339,16 @@ defmodule DemoWeb.ChatLive do
     end
   end
 
-  # Catch-all: forward to textarea, but swallow ctrl/alt/meta combos —
-  # the textarea NIF expects string modifiers, but the LiveView hook
-  # delivers atoms. Forwarding `[:ctrl]` would crash the runtime and
-  # end the session (the source of the "any Ctrl key quits" bug).
+  # Catch-all: forward to the textarea, but swallow ctrl/alt/meta combos.
+  # Modifiers from the LiveView hook are strings (e.g. `["shift"]`) — the
+  # same shape the textarea NIF and every other transport use — so they
+  # forward as-is. (This previously assumed atoms and crashed the runtime
+  # on any modifier, including Shift and capital letters.)
   def tui_handle_event(%Key{code: code, modifiers: mods}, state) when is_list(mods) do
-    if Enum.any?(mods, &(&1 in [:ctrl, :alt, :meta, :super, :hyper])) do
+    if Enum.any?(mods, &(&1 in ["ctrl", "alt", "meta", "super", "hyper"])) do
       {:noreply, state}
     else
-      string_mods = Enum.map(mods, &Atom.to_string/1)
-      ExRatatui.textarea_handle_key(state.textarea, code, string_mods)
+      ExRatatui.textarea_handle_key(state.textarea, code, mods)
       {:noreply, check_slash_command(state)}
     end
   end
