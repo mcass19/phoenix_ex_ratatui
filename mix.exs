@@ -40,6 +40,8 @@ defmodule PhoenixExRatatui.MixProject do
           PhoenixExRatatui.TestParentLive,
           PhoenixExRatatui.TestCallbacksLive,
           PhoenixExRatatui.TestCallbacksLive.Runtime,
+          PhoenixExRatatui.TestCallbacksComponent,
+          PhoenixExRatatui.TestCallbacksComponent.Runtime,
           PhoenixExRatatui.TestEndpoint,
           PhoenixExRatatui.TestErrorHTML
         ]
