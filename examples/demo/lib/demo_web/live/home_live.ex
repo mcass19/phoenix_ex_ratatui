@@ -51,6 +51,9 @@ defmodule DemoWeb.HomeLive do
   def tui_update({:event, %Key{code: "x"}}, state),
     do: {:noreply, state, intents: [{:navigate, "/coexistence"}]}
 
+  def tui_update({:event, %Key{code: "d"}}, state),
+    do: {:noreply, state, intents: [{:navigate, "/cube"}]}
+
   def tui_update({:event, %Key{code: "q"}}, state),
     do: {:noreply, state, intents: [{:redirect, [external: @repo_url]}]}
 
@@ -71,7 +74,9 @@ defmodule DemoWeb.HomeLive do
     # BigText only aligns horizontally, so center the 8-row-tall title
     # band by hand inside the box's border for vertical centering too.
     title_band = UI.center_box(inner_rect(box), box.width - 2, @title_rows)
-    footer = UI.nav_hints([{"c", "chat"}, {"a", "admin"}, {"x", "coexist"}, {"q", "exit"}])
+
+    footer =
+      UI.nav_hints([{"c", "chat"}, {"a", "admin"}, {"x", "coexist"}, {"d", "3d"}, {"q", "exit"}])
 
     [
       {rain_canvas, content_area},
