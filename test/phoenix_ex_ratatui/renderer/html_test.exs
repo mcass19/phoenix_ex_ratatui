@@ -137,7 +137,8 @@ defmodule PhoenixExRatatui.Renderer.HtmlTest do
       assert Html.encode_diff(diff) == %{
                "width" => 80,
                "height" => 24,
-               "ops" => [[0, 0, "A", "red", "reset", [], false]]
+               "ops" => [[0, 0, "A", "red", "reset", [], false]],
+               "regions" => []
              }
     end
 
@@ -145,6 +146,40 @@ defmodule PhoenixExRatatui.Renderer.HtmlTest do
       diff = %Diff{width: 10, height: 5, ops: []}
 
       assert Html.encode_diff(diff) == %{
+               "width" => 10,
+               "height" => 5,
+               "ops" => [],
+               "regions" => []
+             }
+    end
+
+    test "pixel regions become [x, y, width, height, png_data_url] entries" do
+      alias ExRatatui.CellSession.Region
+
+      region = %Region{
+        x: 2,
+        y: 1,
+        width: 1,
+        height: 1,
+        pixel_width: 2,
+        pixel_height: 1,
+        format: :rgb8,
+        data: <<255, 0, 0, 0, 0, 255>>
+      }
+
+      diff = %Diff{width: 10, height: 5, ops: [], regions: [region]}
+
+      assert %{"regions" => [[2, 1, 1, 1, "data:image/png;base64," <> base64]]} =
+               Html.encode_diff(diff)
+
+      assert <<137, 80, 78, 71, _::binary>> = Base.decode64!(base64)
+      assert Html.encode_region(region) == hd(Html.encode_diff(diff)["regions"])
+    end
+
+    test "regions: false leaves the key out (for frames whose regions did not change)" do
+      diff = %Diff{width: 10, height: 5, ops: []}
+
+      assert Html.encode_diff(diff, regions: false) == %{
                "width" => 10,
                "height" => 5,
                "ops" => []
@@ -191,7 +226,8 @@ defmodule PhoenixExRatatui.Renderer.HtmlTest do
                "ops" => [
                  [0, 0, "X", ["rgb", 100, 150, 200], ["indexed", 42], ["bold", "italic"], false],
                  [1, 3, " ", "reset", "light_cyan", [], true]
-               ]
+               ],
+               "regions" => []
              }
     end
   end

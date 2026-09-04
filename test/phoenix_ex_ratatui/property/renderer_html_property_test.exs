@@ -115,7 +115,7 @@ defmodule PhoenixExRatatui.Property.RendererHtmlPropertyTest do
       encoded = Html.encode_diff(diff)
 
       assert is_map(encoded)
-      assert Map.keys(encoded) |> Enum.sort() == ["height", "ops", "width"]
+      assert Map.keys(encoded) |> Enum.sort() == ["height", "ops", "regions", "width"]
       assert encoded["width"] == diff.width
       assert encoded["height"] == diff.height
       assert is_list(encoded["ops"])

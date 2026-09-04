@@ -26,6 +26,9 @@ defmodule PhoenixExRatatui.MixProject do
         ignore_modules: [
           # Test fixtures — exercised by tests, not production surface.
           PhoenixExRatatui.TestApp,
+          PhoenixExRatatui.CubeApp,
+          PhoenixExRatatui.CubeLive,
+          PhoenixExRatatui.CubeLive.Runtime,
           PhoenixExRatatui.FailingMountApp,
           PhoenixExRatatui.TestLive,
           PhoenixExRatatui.TestLive.Runtime,
@@ -73,7 +76,10 @@ defmodule PhoenixExRatatui.MixProject do
 
   defp deps do
     [
-      {:ex_ratatui, "~> 0.10"},
+      # Local checkout while CellSession pixel regions are unreleased; the
+      # source build needs rustler. Switch back to hex once released.
+      {:ex_ratatui, path: "../ex_ratatui"},
+      {:rustler, "~> 0.38", runtime: false},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.1"},
       {:telemetry, "~> 1.0"},

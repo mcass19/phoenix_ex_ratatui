@@ -20,8 +20,20 @@ defmodule PhoenixExRatatui.Renderer.Html do
         "ops" => [
           [row, col, symbol, fg, bg, modifiers, skip],
           ...
+        ],
+        "regions" => [
+          [x, y, width, height, "data:image/png;base64,..."],
+          ...
         ]
       }
+
+  `"regions"` carries the pixel regions of a `CellSession` created with a
+  `font_size:` — the bitmaps `Viewport3D` and `Image` render on a pixel
+  surface — each as its cell rect plus a PNG data URL the client draws
+  over those cells (see `ExRatatui.CellSession.Region`). It is the complete
+  set on screen for the frame; when the caller knows it has not changed
+  since the previous frame it passes `regions: false` and the key is left
+  out, which the client reads as "keep what you have".
 
   Where each value follows these encodings:
 
@@ -59,6 +71,7 @@ defmodule PhoenixExRatatui.Renderer.Html do
 
   alias ExRatatui.CellSession.Cell
   alias ExRatatui.CellSession.Diff
+  alias ExRatatui.CellSession.Region
 
   @typedoc """
   JSON-friendly encoded color: a string for named/reset colors, or a
@@ -83,18 +96,26 @@ defmodule PhoenixExRatatui.Renderer.Html do
           ]
 
   @typedoc """
+  JSON-friendly encoded pixel region: a 5-element list in `[x, y, width,
+  height, png_data_url]` order, the rect in cells.
+  """
+  @type encoded_region :: [non_neg_integer() | String.t(), ...]
+
+  @typedoc """
   Full diff payload as it appears on the LiveView socket. String map
   keys (not atoms) so it round-trips cleanly through `Jason`.
   """
   @type encoded_diff :: %{
-          required(String.t()) => non_neg_integer() | [encoded_cell()]
+          required(String.t()) => non_neg_integer() | [encoded_cell()] | [encoded_region()]
         }
 
   @doc """
   Encodes an `ExRatatui.CellSession.Diff` into the JSON-friendly map
   shape `Phoenix.LiveView.push_event/3` ships to the client.
 
-  See the moduledoc for the full wire shape.
+  See the moduledoc for the full wire shape. Pass `regions: false` to
+  leave the `"regions"` key out, for frames whose region set is known
+  to be unchanged (PNG encoding is skipped too).
 
   ## Examples
 
@@ -107,16 +128,33 @@ defmodule PhoenixExRatatui.Renderer.Html do
       %{
         "width" => 2,
         "height" => 1,
-        "ops" => [[0, 0, "X", "red", "reset", ["bold"], false]]
+        "ops" => [[0, 0, "X", "red", "reset", ["bold"], false]],
+        "regions" => []
       }
   """
-  @spec encode_diff(Diff.t()) :: encoded_diff()
-  def encode_diff(%Diff{width: w, height: h, ops: ops}) do
-    %{
+  @spec encode_diff(Diff.t(), regions: boolean()) :: encoded_diff()
+  def encode_diff(%Diff{width: w, height: h, ops: ops, regions: regions}, opts \\ []) do
+    payload = %{
       "width" => w,
       "height" => h,
       "ops" => Enum.map(ops, &encode_cell/1)
     }
+
+    if Keyword.get(opts, :regions, true) do
+      Map.put(payload, "regions", Enum.map(regions, &encode_region/1))
+    else
+      payload
+    end
+  end
+
+  @doc """
+  Encodes a pixel region as `[x, y, width, height, png_data_url]`: the
+  covered rect in cells and the bitmap as a PNG data URL, so the client
+  can point an `<img>` at it without a second round trip.
+  """
+  @spec encode_region(Region.t()) :: encoded_region()
+  def encode_region(%Region{x: x, y: y, width: w, height: h} = region) do
+    [x, y, w, h, "data:image/png;base64," <> Base.encode64(Region.to_png(region))]
   end
 
   @doc """

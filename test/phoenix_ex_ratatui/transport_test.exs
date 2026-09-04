@@ -115,6 +115,41 @@ defmodule PhoenixExRatatui.TransportTest do
     end
   end
 
+  describe "start_link/1 with :font_size" do
+    alias ExRatatui.CellSession.Region
+    alias PhoenixExRatatui.CubeApp
+
+    test "creates a pixel-region session and keeps the option out of mount/1" do
+      {:ok, refs} =
+        Transport.start_link(
+          mod: CubeApp,
+          width: 20,
+          height: 10,
+          target: self(),
+          test_pid: self(),
+          font_size: {8, 16}
+        )
+
+      assert_receive {:mounted, opts}, 1000
+      refute Keyword.has_key?(opts, :font_size)
+
+      assert_receive {:phoenix_ex_ratatui, :render, %Diff{regions: [%Region{} = region]}}, 1000
+      assert {region.width, region.height} == {20, 10}
+      assert {region.pixel_width, region.pixel_height} == {160, 160}
+
+      Transport.stop(refs)
+    end
+
+    test "without :font_size the same app renders cells only" do
+      {:ok, refs} =
+        Transport.start_link(mod: CubeApp, width: 20, height: 10, target: self())
+
+      assert_receive {:phoenix_ex_ratatui, :render, %Diff{regions: []}}, 1000
+
+      Transport.stop(refs)
+    end
+  end
+
   describe "push_event/2" do
     test "delivers an event to the App via the server mailbox" do
       {:ok, refs} =

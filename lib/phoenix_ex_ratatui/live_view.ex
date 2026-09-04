@@ -153,7 +153,7 @@ defmodule PhoenixExRatatui.LiveView do
   """
 
   alias ExRatatui.Event.Key
-  alias PhoenixExRatatui.Renderer.Html
+  alias PhoenixExRatatui.Regions
   alias PhoenixExRatatui.Telemetry
   alias PhoenixExRatatui.Transport
 
@@ -250,6 +250,7 @@ defmodule PhoenixExRatatui.LiveView do
           |> Phoenix.Component.assign(:tui, nil)
           |> Phoenix.Component.assign(:tui_error, nil)
           |> Phoenix.Component.assign(:tui_ended, false)
+          |> Phoenix.Component.assign(:tui_regions, nil)
           |> Phoenix.Component.assign(:tui_container_id, @phoenix_ex_ratatui_container_id)
           |> Phoenix.Component.assign(:tui_runtime_mod, @phoenix_ex_ratatui_runtime_mod)
 
@@ -446,9 +447,14 @@ defmodule PhoenixExRatatui.LiveView do
   @doc false
   # `:handle_event` hook. Halts on the two browser events the JS hook
   # emits; lets everything else through to the user's own handle_event/3.
-  def __event_hook__(user_mod, "phx_ex_ratatui:resize", %{"cols" => cols, "rows" => rows}, socket)
+  def __event_hook__(
+        user_mod,
+        "phx_ex_ratatui:resize",
+        %{"cols" => cols, "rows" => rows} = params,
+        socket
+      )
       when is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
-    {:halt, __handle_resize__(socket, user_mod, cols, rows)}
+    {:halt, __handle_resize__(socket, user_mod, cols, rows, __font_size__(params))}
   end
 
   def __event_hook__(_user_mod, "phx_ex_ratatui:input", payload, socket) when is_map(payload) do
@@ -480,14 +486,32 @@ defmodule PhoenixExRatatui.LiveView do
   def __info_hook__(_runtime_mod, _msg, socket), do: {:cont, socket}
 
   @doc false
-  def __handle_resize__(socket, user_mod, cols, rows) do
+  # The cell size the JS hook measured, in device pixels, from a resize
+  # payload. `nil` when absent or malformed: the session then stays
+  # cell-only rather than failing the resize.
+  def __font_size__(%{"cell_width" => w, "cell_height" => h})
+      when is_integer(w) and w > 0 and is_integer(h) and h > 0,
+      do: {w, h}
+
+  def __font_size__(_params), do: nil
+
+  @doc false
+  # The font size only matters when the transport starts: the session's
+  # cell pixel size is fixed for its lifetime, later resizes just change
+  # the grid.
+  def __handle_resize__(socket, user_mod, cols, rows, font_size) do
     case socket.assigns.tui do
-      nil -> __start_transport__(socket, user_mod, cols, rows)
+      nil -> __start_transport__(socket, user_mod, cols, rows, font_size)
       refs -> __resize_transport__(socket, refs, cols, rows)
     end
   end
 
-  defp __start_transport__(socket, user_mod, cols, rows) do
+  @doc false
+  # `[font_size: {w, h}]` or `[]`, to splice into `Transport.start_link/1` opts.
+  def __font_size_opts__(nil), do: []
+  def __font_size_opts__({_w, _h} = font_size), do: [font_size: font_size]
+
+  defp __start_transport__(socket, user_mod, cols, rows, font_size) do
     runtime_mod = Module.concat(user_mod, "Runtime")
     mount_opts = user_mod.tui_mount_opts(socket)
 
@@ -497,7 +521,7 @@ defmodule PhoenixExRatatui.LiveView do
         width: cols,
         height: rows,
         target: self()
-      ] ++ mount_opts
+      ] ++ __font_size_opts__(font_size) ++ mount_opts
 
     case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
@@ -531,9 +555,10 @@ defmodule PhoenixExRatatui.LiveView do
   @doc false
   def __push_render__(socket, mod, diff) do
     meta = %{mod: mod, width: diff.width, height: diff.height, ops_count: length(diff.ops)}
+    {socket, payload} = Regions.payload(socket, diff)
 
     Telemetry.span([:render, :frame], meta, fn ->
-      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
+      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", payload)
     end)
   end
 

@@ -117,6 +117,30 @@ defmodule PhoenixExRatatui.LiveComponentTest do
       assert length(payload["ops"]) == 16 * 3
     end
 
+    test "a resize carrying the cell size opens a pixel-region session; unchanged regions are not re-sent" do
+      {:ok, view, _html} = live_isolated(build_conn(), TestParentLive)
+
+      view
+      |> element("#embedded-tui")
+      |> render_hook("phx_ex_ratatui:resize", %{
+        "cols" => 16,
+        "rows" => 3,
+        "cell_width" => 8,
+        "cell_height" => 16
+      })
+
+      # The first frame always states the region set, empty here since
+      # the fixture paints text only.
+      assert_push_event(view, "phx_ex_ratatui:render", %{"regions" => []}, 1000)
+
+      view
+      |> element("#embedded-tui")
+      |> render_hook("phx_ex_ratatui:input", %{"kind" => "key", "code" => "x"})
+
+      assert_push_event(view, "phx_ex_ratatui:render", next, 1000)
+      refute Map.has_key?(next, "regions")
+    end
+
     test "subsequent resize delegates through Transport.resize and produces a full frame at the new size" do
       {:ok, view, _html} = live_isolated(build_conn(), TestParentLive)
 
