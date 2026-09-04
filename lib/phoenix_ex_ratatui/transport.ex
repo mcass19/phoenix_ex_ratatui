@@ -86,6 +86,11 @@ defmodule PhoenixExRatatui.Transport do
     * `:mod` (required) — module implementing `ExRatatui.App`.
     * `:width` (required) — initial terminal width in cells. Must be `>= 1`.
     * `:height` (required) — initial terminal height in cells. Must be `>= 1`.
+    * `:font_size` (optional) — `{width, height}` of one cell in device
+      pixels, as measured by the browser. Given, the `CellSession` is a
+      pixel surface: `Viewport3D` and `Image` widgets in pixel modes ship
+      real bitmaps as `ExRatatui.CellSession.Region`s in each diff
+      instead of half-block cells. Without it they fall back to cells.
     * `:target` (required) — `t:pid/0` the runtime server should be
       linked to (typically `self()` from a LiveView mount). Used by
       the default writer if `:writer` is not given.
@@ -134,10 +139,11 @@ defmodule PhoenixExRatatui.Transport do
         :transport,
         :name,
         :writer,
-        :intent_writer
+        :intent_writer,
+        :font_size
       ])
 
-    cell_session = CellSession.new(width, height)
+    cell_session = CellSession.new(width, height, Keyword.take(opts, [:font_size]))
     writer_fn = Keyword.get(opts, :writer) || build_writer(target)
     intent_writer_fn = Keyword.get(opts, :intent_writer) || build_intent_writer(target)
 

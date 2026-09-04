@@ -404,6 +404,72 @@ defmodule PhoenixExRatatui.LiveViewTest do
     end
   end
 
+  describe "pixel regions" do
+    alias PhoenixExRatatui.CubeLive
+
+    test "a resize carrying the cell size makes pixel widgets arrive as PNG regions" do
+      {:ok, view, _html} = live_isolated(build_conn(), CubeLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{
+        "cols" => 20,
+        "rows" => 10,
+        "cell_width" => 8,
+        "cell_height" => 16
+      })
+
+      assert_push_event(view, "phx_ex_ratatui:render", payload, 1000)
+      assert [[0, 0, 20, 10, "data:image/png;base64," <> base64]] = payload["regions"]
+      assert <<137, 80, 78, 71, 13, 10, 26, 10, _::binary>> = Base.decode64!(base64)
+      # The covered cells are blank, not half blocks.
+      refute Enum.any?(payload["ops"], fn [_, _, sym | _] -> sym == "▀" end)
+    end
+
+    test "an unchanged region set is left out of the next frame, a changed one is sent again" do
+      {:ok, view, _html} = live_isolated(build_conn(), CubeLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{
+        "cols" => 20,
+        "rows" => 10,
+        "cell_width" => 8,
+        "cell_height" => 16
+      })
+
+      assert_push_event(view, "phx_ex_ratatui:render", %{"regions" => [_]}, 1000)
+
+      # A no-op event re-renders the identical scene.
+      render_hook(view, "phx_ex_ratatui:input", %{"kind" => "key", "code" => "noop"})
+      assert_push_event(view, "phx_ex_ratatui:render", unchanged, 1000)
+      refute Map.has_key?(unchanged, "regions")
+
+      # Any other key rotates the cube: new bitmap, new region payload.
+      render_hook(view, "phx_ex_ratatui:input", %{"kind" => "key", "code" => "x"})
+      assert_push_event(view, "phx_ex_ratatui:render", %{"regions" => [_]}, 1000)
+    end
+
+    test "without a cell size the session stays cell-only" do
+      {:ok, view, _html} = live_isolated(build_conn(), CubeLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{"cols" => 20, "rows" => 10})
+
+      assert_push_event(view, "phx_ex_ratatui:render", payload, 1000)
+      assert payload["regions"] == []
+      assert Enum.any?(payload["ops"], fn [_, _, sym | _] -> sym == "▀" end)
+    end
+
+    test "a malformed cell size is ignored rather than rejected" do
+      {:ok, view, _html} = live_isolated(build_conn(), CubeLive)
+
+      render_hook(view, "phx_ex_ratatui:resize", %{
+        "cols" => 20,
+        "rows" => 10,
+        "cell_width" => 0,
+        "cell_height" => "big"
+      })
+
+      assert_push_event(view, "phx_ex_ratatui:render", %{"regions" => []}, 1000)
+    end
+  end
+
   describe "phx_ex_ratatui:input event" do
     test "input before resize is silently dropped (no Transport yet)" do
       {:ok, view, _html} = live_isolated(build_conn(), TestLive)

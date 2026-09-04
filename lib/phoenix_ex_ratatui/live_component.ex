@@ -129,7 +129,7 @@ defmodule PhoenixExRatatui.LiveComponent do
   """
 
   alias PhoenixExRatatui.LiveView, as: PXRLV
-  alias PhoenixExRatatui.Renderer.Html
+  alias PhoenixExRatatui.Regions
   alias PhoenixExRatatui.Telemetry
   alias PhoenixExRatatui.Transport
 
@@ -188,6 +188,7 @@ defmodule PhoenixExRatatui.LiveComponent do
          socket
          |> Phoenix.Component.assign(:tui, nil)
          |> Phoenix.Component.assign(:tui_error, nil)
+         |> Phoenix.Component.assign(:tui_regions, nil)
          |> Phoenix.Component.assign(:tui_runtime_mod, @phoenix_ex_ratatui_runtime_mod)}
       end
 
@@ -237,12 +238,20 @@ defmodule PhoenixExRatatui.LiveComponent do
       @impl Phoenix.LiveComponent
       def handle_event(
             "phx_ex_ratatui:resize",
-            %{"cols" => cols, "rows" => rows},
+            %{"cols" => cols, "rows" => rows} = params,
             socket
           )
           when is_integer(cols) and cols > 0 and is_integer(rows) and rows > 0 do
+        font_size = PhoenixExRatatui.LiveView.__font_size__(params)
+
         {:noreply,
-         PhoenixExRatatui.LiveComponent.__handle_resize__(socket, __MODULE__, cols, rows)}
+         PhoenixExRatatui.LiveComponent.__handle_resize__(
+           socket,
+           __MODULE__,
+           cols,
+           rows,
+           font_size
+         )}
       end
 
       def handle_event("phx_ex_ratatui:input", payload, socket) when is_map(payload) do
@@ -270,20 +279,22 @@ defmodule PhoenixExRatatui.LiveComponent do
       ops_count: length(diff.ops)
     }
 
+    {socket, payload} = Regions.payload(socket, diff)
+
     Telemetry.span([:render, :frame], meta, fn ->
-      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", Html.encode_diff(diff))
+      Phoenix.LiveView.push_event(socket, "phx_ex_ratatui:render", payload)
     end)
   end
 
   @doc false
-  def __handle_resize__(socket, user_mod, cols, rows) do
+  def __handle_resize__(socket, user_mod, cols, rows, font_size) do
     case socket.assigns.tui do
-      nil -> __start_transport__(socket, user_mod, cols, rows)
+      nil -> __start_transport__(socket, user_mod, cols, rows, font_size)
       refs -> __resize_transport__(socket, refs, cols, rows)
     end
   end
 
-  defp __start_transport__(socket, user_mod, cols, rows) do
+  defp __start_transport__(socket, user_mod, cols, rows, font_size) do
     parent_pid = self()
     component_module = user_mod
     component_id = socket.assigns.id
@@ -325,7 +336,7 @@ defmodule PhoenixExRatatui.LiveComponent do
         target: parent_pid,
         writer: writer,
         intent_writer: intent_writer
-      ] ++ mount_opts
+      ] ++ PXRLV.__font_size_opts__(font_size) ++ mount_opts
 
     case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
