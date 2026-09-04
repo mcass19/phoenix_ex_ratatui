@@ -96,3 +96,23 @@ test("modifiersFor collects the active modifier keys in canonical order", () => 
     "meta",
   ]);
 });
+
+test("cellPixelSize reports the measured cell in device pixels, never zero", () => {
+  const { cellPixelSize } = __test__;
+  assert.deepEqual(cellPixelSize(8.4, 16.8, 1), { cell_width: 8, cell_height: 17 });
+  assert.deepEqual(cellPixelSize(8.4, 16.8, 2), { cell_width: 17, cell_height: 34 });
+  // A missing or bogus devicePixelRatio counts as 1.
+  assert.deepEqual(cellPixelSize(8, 16, undefined), { cell_width: 8, cell_height: 16 });
+  assert.deepEqual(cellPixelSize(8, 16, 0), { cell_width: 8, cell_height: 16 });
+  // Degenerate measurements still produce a usable size.
+  assert.deepEqual(cellPixelSize(0.2, 0.1, 1), { cell_width: 1, cell_height: 1 });
+});
+
+test("regionStyle places a region over its cell rect through the grid's CSS variables", () => {
+  const { regionStyle } = __test__;
+  assert.equal(
+    regionStyle(2, 3, 38, 33),
+    "left:calc(2 * var(--pxr-cw));top:calc(3 * var(--pxr-ch));" +
+      "width:calc(38 * var(--pxr-cw));height:calc(33 * var(--pxr-ch))",
+  );
+});

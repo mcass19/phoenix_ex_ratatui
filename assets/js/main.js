@@ -86,8 +86,41 @@ function ensureBaseStyle() {
   tag.id = STYLE_TAG_ID;
   tag.textContent =
     ".pxr-row{display:flex;line-height:1}" +
-    ".pxr-cell{display:inline-block;width:var(--pxr-cw);height:var(--pxr-ch);text-align:center}";
+    ".pxr-cell{display:inline-block;width:var(--pxr-cw);height:var(--pxr-ch);text-align:center}" +
+    ".pxr-regions{position:absolute;left:0;top:0;pointer-events:none}" +
+    ".pxr-region{position:absolute;display:block}";
   document.head.appendChild(tag);
+}
+
+// ----------------------------------------------------------------------
+// Pixel regions
+// ----------------------------------------------------------------------
+//
+// A session that knows its cell size in pixels ships Viewport3D / Image
+// widgets as bitmaps: the render payload carries a `regions` list of
+// `[x, y, width, height, pngDataUrl]` entries (rect in cells). We paint
+// each as an <img> in an absolutely positioned layer over the grid,
+// sized with the same CSS variables the cells use, so it tracks the
+// grid exactly. The list is the complete set for the frame; a payload
+// without the key means "keep the current overlays".
+
+// Cell size in *device* pixels, which is what the server needs to
+// rasterize crisply on HiDPI screens (the <img> is scaled back down by
+// CSS). Never reports zero.
+function cellPixelSize(charWidth, charHeight, devicePixelRatio) {
+  const dpr = devicePixelRatio > 0 ? devicePixelRatio : 1;
+  return {
+    cell_width: Math.max(1, Math.round(charWidth * dpr)),
+    cell_height: Math.max(1, Math.round(charHeight * dpr)),
+  };
+}
+
+// Inline style placing a region over its cell rect.
+function regionStyle(x, y, width, height) {
+  return (
+    `left:calc(${x} * var(--pxr-cw));top:calc(${y} * var(--pxr-ch));` +
+    `width:calc(${width} * var(--pxr-cw));height:calc(${height} * var(--pxr-ch))`
+  );
 }
 
 // ----------------------------------------------------------------------
@@ -191,6 +224,9 @@ export const PhoenixExRatatuiHook = {
     this.cells = [];
     this.charWidth = 0;
     this.charHeight = 0;
+    this.regions = [];
+    this.regionLayer = document.createElement("div");
+    this.regionLayer.className = "pxr-regions";
 
     if (this.el.tabIndex < 0) this.el.tabIndex = 0;
 
@@ -200,6 +236,8 @@ export const PhoenixExRatatuiHook = {
     if (!this.el.style.whiteSpace) this.el.style.whiteSpace = "pre";
     if (!this.el.style.lineHeight) this.el.style.lineHeight = "1";
     if (!this.el.style.overflow) this.el.style.overflow = "hidden";
+    // The region layer is positioned against the container.
+    if (!this.el.style.position) this.el.style.position = "relative";
 
     ensureBaseStyle();
 
@@ -262,10 +300,14 @@ export const PhoenixExRatatuiHook = {
       rows = 24;
     }
 
-    this.pushEventTo(this.el, "phx_ex_ratatui:resize", { cols, rows });
+    // The cell size (device pixels) lets the server open a pixel-region
+    // session; it only matters on the first resize, later ones just
+    // change the grid.
+    const cell = cellPixelSize(this.charWidth, this.charHeight, window.devicePixelRatio);
+    this.pushEventTo(this.el, "phx_ex_ratatui:resize", { cols, rows, ...cell });
   },
 
-  applyDiff({ width, height, ops }) {
+  applyDiff({ width, height, ops, regions }) {
     const dimsChanged =
       this.cells.length !== height ||
       (this.cells[0] && this.cells[0].length !== width);
@@ -276,6 +318,24 @@ export const PhoenixExRatatuiHook = {
       const [row, col, sym, fg, bg, mods, skip] = ops[i];
       this.setCell(row, col, sym, fg, bg, mods, skip);
     }
+
+    if (regions !== undefined) this.applyRegions(regions);
+  },
+
+  // Replaces the overlay set. Regions are few (one per pixel widget),
+  // so rebuilding the layer's children is cheaper than diffing them.
+  applyRegions(regions) {
+    this.regions = regions;
+    const images = regions.map(([x, y, width, height, src]) => {
+      const img = document.createElement("img");
+      img.className = "pxr-region";
+      img.style.cssText = regionStyle(x, y, width, height);
+      img.alt = "";
+      img.draggable = false;
+      img.src = src;
+      return img;
+    });
+    this.regionLayer.replaceChildren(...images);
   },
 
   buildGrid(width, height) {
@@ -305,6 +365,10 @@ export const PhoenixExRatatuiHook = {
       this.cells.push(rowCells);
       this.el.appendChild(row);
     }
+
+    // The overlay layer sits above the rows and survives grid rebuilds
+    // (its children are the last region set applied).
+    this.el.appendChild(this.regionLayer);
   },
 
   setCell(row, col, sym, fg, bg, modifiers, skip) {
@@ -367,6 +431,8 @@ export const __test__ = {
   buildStyle,
   keyToCode,
   modifiersFor,
+  cellPixelSize,
+  regionStyle,
   NAMED_COLORS,
   DEFAULT_FG,
   DEFAULT_BG,
