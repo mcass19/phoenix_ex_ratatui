@@ -20,6 +20,8 @@ defmodule DemoWeb.Router do
     # /admin         plain LV embedding a reducer-runtime LiveComponent
     # /coexistence   full-page TUI LV that ALSO defines its own
     #                handle_event/3 + handle_info/2 (HTML toolbar)
+    # /cube          pixel regions: a spinning Viewport3D painted as an
+    #                image over the cell grid
     #
     # Most inter-page navigation flows through `phoenix_ex_ratatui`'s
     # runtime intents (`{:navigate, "/path"}` etc.), dispatched by
@@ -28,5 +30,6 @@ defmodule DemoWeb.Router do
     live("/chat", ChatLive)
     live("/admin", AdminLive)
     live("/coexistence", CoexistenceLive)
+    live("/cube", CubeLive)
   end
 end

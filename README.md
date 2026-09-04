@@ -16,6 +16,7 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 - **Two unified-module APIs** — `use PhoenixExRatatui.LiveView` for a full-page TUI route, `use PhoenixExRatatui.LiveComponent` to embed a TUI inside an existing LiveView. The same module is both the Phoenix component and the `ExRatatui.App` driving it; a hidden `Module.Runtime` proxy bridges the two `handle_info/2` arities.
 - **Callback and reducer runtimes** — `runtime: :reducer` opts into command/subscription-driven apps (`tui_init/1` + `tui_update/2` + `tui_subscriptions/1`); the default `:callbacks` runtime uses `tui_mount/1` + `tui_handle_event/2` + `tui_handle_info/2`.
 - **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas. Arrays not objects, to roughly halve the wire size on full frames.
+- **Pixel regions for images and 3D** — the hook reports the measured cell size, so the `CellSession` is a pixel surface: `ExRatatui.Widgets.Viewport3D` and `ExRatatui.Widgets.Image` in pixel modes arrive as PNG regions painted as `<img>` overlays at the pane's real resolution (HiDPI aware), instead of half-block cells. Unchanged regions are never re-sent.
 - **Tiny, dependency-free JS hook** — ~5KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
 - **Inter-page navigation via runtime intents** — return `{:navigate, "/path"}`, `:patch`, or `:redirect` (internal or external) from any handler; the macro dispatches through `push_navigate/2` and friends.
 - **Auto-focus on full-page TUIs** — keystrokes flow without clicking the grid first. Embedded components deliberately don't steal focus.
@@ -164,10 +165,13 @@ end
                           push_event("phx_ex_ratatui:render", payload)
                                                    ▼
                                        JS hook paints <span> cells
+                                       and <img> pixel regions
    browser keydown ──── "phx_ex_ratatui:input" ────▶ back into the runtime
 ```
 
 A `CellSession` plus a linked ExRatatui.Server drive the module. On each render the server hands a `%CellSession.Diff{}` to the transport, which forwards it to the LiveView; `PhoenixExRatatui.Renderer.Html` encodes it to a JSON-friendly payload and `push_event/3`s it to the browser. The hook paints the deltas and forwards keystrokes back as `phx_ex_ratatui:input` events. Because the `Server` is linked to the LiveView process, teardown is deterministic — when the LiveView exits, the session closes and disconnect telemetry fires.
+
+The hook also measures the cell box and reports it (in device pixels) with its first resize, so the transport opens the `CellSession` with that `font_size:`. From then on `Viewport3D` and `Image` widgets in pixel modes render to real bitmaps: the payload carries a `regions` list of `[x, y, width, height, png_data_url]` entries — the complete set on screen — and the hook paints each as an `<img>` in a layer over the grid, sized with the same CSS variables as the cells. When a frame's region set is unchanged the key is omitted and nothing is re-encoded or re-sent, so a static picture costs nothing per frame. Widgets in cell modes (`:braille`, `:half_block`, `:halfblocks`) keep painting cells. See `ExRatatui.CellSession.Region` and the ex_ratatui guide on rendering to non-terminal surfaces for the contract.
 
 ## Inter-page navigation via runtime intents
 

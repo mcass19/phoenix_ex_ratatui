@@ -271,6 +271,10 @@ Intents from `{:stop, state, intents: ...}` transitions fire **before** the runt
 | `use PhoenixExRatatui.LiveView` | The whole page IS the TUI |
 | `use PhoenixExRatatui.LiveComponent` | The page contains the TUI alongside other content (admin panels, dashboards, modals, dev tooling) |
 
+## Images and 3D
+
+Nothing to configure. The hook measures the cell box in the browser and reports it with its first resize, so the `CellSession` behind the page is a pixel surface: an `ExRatatui.Widgets.Image` or an `ExRatatui.Widgets.Viewport3D` in a pixel render mode (`:auto` is enough) arrives as a PNG region and is painted as an `<img>` over the cell grid at the pane's real resolution, HiDPI included. The widget code is the same one that renders through Kitty graphics in a terminal. Regions travel with the frame's diff as `[x, y, width, height, png_data_url]` entries and are only re-sent when they change. To keep the character look instead, pick a cell mode (`:braille`, `:half_block`) on the widget. The demo's `/cube` page shows both side by side.
+
 ## Telemetry
 
 Both integrations emit the same `:telemetry` events, one layer above the events `ex_ratatui` already emits. Attach the default logger in dev with `PhoenixExRatatui.Telemetry.attach_default_logger(level: :info)`, or wire `Telemetry.Metrics` for production dashboards. The [Telemetry guide](telemetry.md) covers the full event tree, a `Telemetry.Metrics` example, and how the two event layers pair up.

@@ -40,6 +40,28 @@ defmodule DemoWeb.ViewsRenderTest do
     assert painted?(DemoWeb.CoexistenceLive.tui_render(state, frame()))
   end
 
+  test "CubeLive paints the cube as cells on a plain session" do
+    {:ok, state} = DemoWeb.CubeLive.tui_init([])
+    assert painted?(DemoWeb.CubeLive.tui_render(state, frame()))
+  end
+
+  test "CubeLive ships the cube as a pixel region on a font-size session" do
+    {:ok, state} = DemoWeb.CubeLive.tui_init([])
+
+    session = CellSession.new(@width, @height, font_size: {8, 16})
+    :ok = CellSession.draw(session, DemoWeb.CubeLive.tui_render(state, frame()))
+    %{regions: regions} = CellSession.take_cells(session)
+
+    assert [%ExRatatui.CellSession.Region{format: :rgb8}] = regions
+
+    # Toggling to cells keeps the same scene inside the grid.
+    {:noreply, cells_state} =
+      DemoWeb.CubeLive.tui_update({:event, %Key{code: "m", kind: "press"}}, state)
+
+    :ok = CellSession.draw(session, DemoWeb.CubeLive.tui_render(cells_state, frame()))
+    assert %{regions: []} = CellSession.take_cells(session)
+  end
+
   test "ChatLive handles string-modifier keys without crashing" do
     # The LiveView hook delivers modifiers as strings (["shift"], ["ctrl"]).
     # A capital letter or a Shift/Ctrl press must not blow up the runtime.
