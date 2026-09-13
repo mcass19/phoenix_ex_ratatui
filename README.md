@@ -39,6 +39,7 @@ Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
 
 - [ex_ratatui](https://github.com/mcass19/ex_ratatui) — The core terminal UI library this builds on.
 - [kino_ex_ratatui](https://github.com/mcass19/kino_ex_ratatui) — Run TUIs inside [Livebook](https://livebook.dev) notebooks.
+- [raster_ex_ratatui](https://github.com/mcass19/raster_ex_ratatui) — Run TUIs on pixel displays: e-ink panels, SPI LCDs, HDMI through a Linux framebuffer.
 
 ## Installation
 
