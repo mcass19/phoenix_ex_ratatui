@@ -85,7 +85,9 @@ defmodule PhoenixExRatatui.LiveComponent do
   their own mailbox or `handle_info/2`. We hand the runtime Server a
   writer that calls `Phoenix.LiveView.send_update/3` instead of
   `send/2`. Each rendered diff arrives in `update(%{tui_diff: diff},
-  socket)` and flows out to the client via `push_event/3`.
+  socket)` and flows out to the client via `push_event/3`. Pixel
+  regions ride the same payload, as in the LiveView (see
+  `PhoenixExRatatui.Regions`).
 
   Mount-failure handling matches the LiveView macro: if `tui_mount/1`
   returns `{:error, _}`, the runtime server's init returns

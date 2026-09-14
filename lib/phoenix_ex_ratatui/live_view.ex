@@ -95,14 +95,17 @@ defmodule PhoenixExRatatui.LiveView do
     `__attach_hooks__/3`).
   - **First `phx_ex_ratatui:resize`** — call `tui_mount_opts/1`, start
     the Transport at `{cols, rows}` driving the generated `Runtime`
-    proxy.
+    proxy. The cell size the hook measured becomes the session's
+    `:font_size`, so `Viewport3D` and `Image` in pixel modes ship as
+    pixel regions.
   - **Subsequent resizes** — `Transport.resize/3` updates the
     `CellSession` and notifies the runtime.
   - **Hook input** — the `:handle_event` hook decodes it into an
     `%ExRatatui.Event.Key{}` and forwards it via `Transport.push_event/2`.
   - **Runtime emits a frame** — the `:handle_info` hook encodes it via
-    `PhoenixExRatatui.Renderer.Html.encode_diff/1` and pushes a
-    `phx_ex_ratatui:render` event.
+    `PhoenixExRatatui.Renderer.Html.encode_diff/2` and pushes a
+    `phx_ex_ratatui:render` event, carrying `"regions"` only when the
+    region list changed (see `PhoenixExRatatui.Regions`).
   - **Runtime exits** (App returned `{:stop, _}`, or crash) — the
     `:handle_info` hook gets the server's EXIT signal, nulls out `:tui`,
     sets `:tui_ended` so the user sees a refresh prompt instead of a

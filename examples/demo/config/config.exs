@@ -12,10 +12,6 @@ config :demo, DemoWeb.Endpoint,
 
 config :phoenix, :json_library, Jason
 
-# ex_ratatui is a local checkout (through phoenix_ex_ratatui's path dep)
-# until CellSession pixel regions are released: build its NIF from source.
-config :rustler_precompiled, :force_build, ex_ratatui: true
-
 # Single esbuild profile for the demo. Bundles assets/js/app.js
 # (which imports the phoenix_ex_ratatui hook from deps/) into
 # priv/static/assets/app.js.

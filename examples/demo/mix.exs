@@ -18,7 +18,8 @@ defmodule Demo.MixProject do
   def application do
     [
       mod: {Demo.Application, []},
-      extra_applications: [:logger, :runtime_tools, :telemetry]
+      # :inets and :ssl fetch the /cube page's photos from picsum.photos.
+      extra_applications: [:logger, :runtime_tools, :telemetry, :inets, :ssl]
     ]
   end
 
@@ -37,7 +38,7 @@ defmodule Demo.MixProject do
       {:telemetry, "~> 1.0"},
 
       # Asset compilation
-      {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.8", runtime: Mix.env() == :dev}
     ]
   end
 end

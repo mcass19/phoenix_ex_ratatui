@@ -56,8 +56,8 @@ defmodule PhoenixExRatatui do
   })
   ```
 
-  The hook handles cell-grid measurement, paint, key forwarding, and
-  resize reporting. No additional CSS is required (the hook sets a
+  The hook handles cell-grid measurement, paint, key forwarding,
+  resize reporting, and the `<img>` overlays for pixel regions. No additional CSS is required (the hook sets a
   monospace font, `white-space: pre`, and `line-height: 1` on its
   container as defaults; users override any of those via their own
   CSS).
@@ -70,7 +70,7 @@ defmodule PhoenixExRatatui do
   {:phoenix_ex_ratatui, "~> 0.2"}
   ```
 
-  It pulls in `ex_ratatui` (`~> 0.10`) transitively, which ships a
+  It pulls in `ex_ratatui` (`~> 0.14`) transitively, which ships a
   precompiled NIF — no Rust toolchain required.
   """
 end

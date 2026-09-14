@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Pixel regions.** When the JS hook reports the measured cell size (`cell_width` / `cell_height`, in device pixels) with its resize event, the transport creates the `CellSession` with that `font_size:`, and `Viewport3D` and `Image` widgets in pixel modes ship real bitmaps instead of half-block cells. The render payload gains a `"regions"` list of `[x, y, width, height, png_data_url]` entries (encoded by `PhoenixExRatatui.Renderer.Html.encode_region/1`), the complete set on screen for the frame; when the set is unchanged since the previous frame the key is omitted (`PhoenixExRatatui.Regions`), so a static scene costs nothing on the socket. `PhoenixExRatatui.Transport.start_link/1` accepts `:font_size` directly. Requires ex_ratatui with `CellSession` pixel regions.
-- **JS hook: pixel-region overlay.** The hook reports the measured cell size (device pixels) with its resize event and paints each region as an `<img>` in an absolutely positioned layer over the grid, placed and sized through the existing `--pxr-cw` / `--pxr-ch` variables; a payload without `"regions"` keeps the current overlays, an empty list clears them. Rebuild your assets to pick it up.
+- **Pixel regions.** When the JS hook reports the measured cell size (`cell_width` / `cell_height`, in device pixels) with its resize event, the transport creates the `CellSession` with that `font_size:`, and `Viewport3D` and `Image` widgets in pixel modes ship real bitmaps instead of half-block cells. The render payload gains a `"regions"` list of `[x, y, width, height, png_data_url]` entries (encoded by `PhoenixExRatatui.Renderer.Html.encode_region/1`), the complete set on screen for the frame; when the set is unchanged since the previous frame the key is omitted (`PhoenixExRatatui.Regions`), so a static scene costs nothing on the socket. `PhoenixExRatatui.Transport.start_link/1` accepts `:font_size` directly. Requires ex_ratatui 0.14 or later.
+- **JS hook: pixel-region overlay.** The hook reports the measured cell size (device pixels) with its resize event and paints each region as an `<img>` in an absolutely positioned layer over the grid, placed and sized through the existing `--pxr-cw` / `--pxr-ch` variables; a payload without `"regions"` keeps the current overlays, an empty list clears them. New images are swapped in only once they are decoded, so an animated region does not flash in browsers that paint a still-decoding `<img>` as empty (Firefox). Rebuild the assets to pick it up.
 
 ### Examples
 
-- `/cube` in the demo app: a spinning `Viewport3D` rendered as a pixel region, with `m` toggling to `:braille` cells for comparison.
+- `/cube` in the demo app: a spinning `Viewport3D` next to a random [picsum.photos](https://picsum.photos) `Image`, both rendered as pixel regions, with `m` toggling both to cells for comparison and `n` fetching another photo.
 
 ## [0.2.0] - 2026-06-23
 
