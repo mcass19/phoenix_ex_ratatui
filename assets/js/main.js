@@ -123,6 +123,19 @@ function regionStyle(x, y, width, height) {
   );
 }
 
+// Returns a function that runs `apply(value)` once `promise` settles, but
+// only for the most recent call: a frame whose images finish decoding after
+// a newer frame's never overwrites it.
+function latestOnly() {
+  let generation = 0;
+  return (promise, apply) => {
+    const current = ++generation;
+    return promise.then((value) => {
+      if (current === generation) apply(value);
+    });
+  };
+}
+
 // ----------------------------------------------------------------------
 // Style assembly
 // ----------------------------------------------------------------------
@@ -224,7 +237,7 @@ export const PhoenixExRatatuiHook = {
     this.cells = [];
     this.charWidth = 0;
     this.charHeight = 0;
-    this.regions = [];
+    this.swapRegions = latestOnly();
     this.regionLayer = document.createElement("div");
     this.regionLayer.className = "pxr-regions";
 
@@ -325,7 +338,6 @@ export const PhoenixExRatatuiHook = {
   // Replaces the overlay set. Regions are few (one per pixel widget),
   // so rebuilding the layer's children is cheaper than diffing them.
   applyRegions(regions) {
-    this.regions = regions;
     const images = regions.map(([x, y, width, height, src]) => {
       const img = document.createElement("img");
       img.className = "pxr-region";
@@ -335,7 +347,12 @@ export const PhoenixExRatatuiHook = {
       img.src = src;
       return img;
     });
-    this.regionLayer.replaceChildren(...images);
+
+    // Swap only once every new bitmap is decoded. Firefox paints an <img>
+    // that is still decoding as empty, so swapping right away made an
+    // animated region flash. A bitmap that fails to decode still swaps in.
+    const decoded = Promise.all(images.map((img) => img.decode().catch(() => {})));
+    this.swapRegions(decoded, () => this.regionLayer.replaceChildren(...images));
   },
 
   buildGrid(width, height) {
@@ -433,6 +450,7 @@ export const __test__ = {
   modifiersFor,
   cellPixelSize,
   regionStyle,
+  latestOnly,
   NAMED_COLORS,
   DEFAULT_FG,
   DEFAULT_BG,

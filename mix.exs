@@ -76,10 +76,7 @@ defmodule PhoenixExRatatui.MixProject do
 
   defp deps do
     [
-      # Local checkout while CellSession pixel regions are unreleased; the
-      # source build needs rustler. Switch back to hex once released.
-      {:ex_ratatui, path: "../ex_ratatui"},
-      {:rustler, "~> 0.38", runtime: false},
+      {:ex_ratatui, "~> 0.14"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.1"},
       {:telemetry, "~> 1.0"},

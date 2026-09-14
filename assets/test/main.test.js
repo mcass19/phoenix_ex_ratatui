@@ -116,3 +116,31 @@ test("regionStyle places a region over its cell rect through the grid's CSS vari
       "width:calc(38 * var(--pxr-cw));height:calc(33 * var(--pxr-ch))",
   );
 });
+
+test("latestOnly applies only the newest call, even when an older one settles last", async () => {
+  const { latestOnly } = __test__;
+  const swap = latestOnly();
+  const applied = [];
+
+  let resolveOld;
+  const old = new Promise((resolve) => (resolveOld = resolve));
+  const oldDone = swap(old, (frame) => applied.push(frame));
+  const newDone = swap(Promise.resolve("new"), (frame) => applied.push(frame));
+
+  await newDone;
+  resolveOld("old");
+  await oldDone;
+
+  assert.deepEqual(applied, ["new"]);
+});
+
+test("latestOnly applies calls in sequence when each settles before the next", async () => {
+  const { latestOnly } = __test__;
+  const swap = latestOnly();
+  const applied = [];
+
+  await swap(Promise.resolve(1), (frame) => applied.push(frame));
+  await swap(Promise.resolve(2), (frame) => applied.push(frame));
+
+  assert.deepEqual(applied, [1, 2]);
+});

@@ -273,7 +273,7 @@ Intents from `{:stop, state, intents: ...}` transitions fire **before** the runt
 
 ## Images and 3D
 
-Nothing to configure. The hook measures the cell box in the browser and reports it with its first resize, so the `CellSession` behind the page is a pixel surface: an `ExRatatui.Widgets.Image` or an `ExRatatui.Widgets.Viewport3D` in a pixel render mode (`:auto` is enough) arrives as a PNG region and is painted as an `<img>` over the cell grid at the pane's real resolution, HiDPI included. The widget code is the same one that renders through Kitty graphics in a terminal. Regions travel with the frame's diff as `[x, y, width, height, png_data_url]` entries and are only re-sent when they change. To keep the character look instead, pick a cell mode (`:braille`, `:half_block`) on the widget. The demo's `/cube` page shows both side by side.
+Nothing to configure. The hook measures the cell box in the browser and reports it with its first resize, so the `CellSession` behind the page is a pixel surface: an `ExRatatui.Widgets.Image` or an `ExRatatui.Widgets.Viewport3D` in a pixel render mode (`:auto` is enough) arrives as a PNG region and is painted as an `<img>` over the cell grid at the pane's real resolution, HiDPI included. The widget code is the same one that renders through Kitty graphics in a terminal. Regions travel with the frame's diff as `[x, y, width, height, png_data_url]` entries and are only re-sent when they change. To keep the character look instead, pick a cell mode on the widget: `render_mode: :braille` or `:half_block` on a `Viewport3D`, `protocol: :halfblocks` on an `Image`. The demo's `/cube` page renders a cube and a photo and toggles both between the two.
 
 ## Telemetry
 
@@ -283,5 +283,5 @@ Both integrations emit the same `:telemetry` events, one layer above the events 
 
 That's [`kino_ex_ratatui`](https://github.com/mcass19/kino_ex_ratatui) — same parent library, but it's built around xterm.js and is the right pick for a real terminal emulator in the page.
 
-`phoenix_ex_ratatui` is deliberately different: cells are pushed directly to the DOM as styled `<span>`s. The advantages are that the bundle is tiny (~5KB minified, no third-party deps), phones get real touch events, and the cell grid is just HTML — themeable with CSS, accessible to screen readers, copy/pasteable. The trade-off is no scrollback, no shell semantics, no ANSI alt-screen — if a TUI was relying on those, `kino_ex_ratatui` (or running the App over SSH) is the right call.
+`phoenix_ex_ratatui` is deliberately different: cells are pushed directly to the DOM as styled `<span>`s. The advantages are that the bundle is tiny (~6KB minified, no third-party deps), phones get real touch events, and the cell grid is just HTML — themeable with CSS, accessible to screen readers, copy/pasteable. The trade-off is no scrollback, no shell semantics, no ANSI alt-screen — if a TUI was relying on those, `kino_ex_ratatui` (or running the App over SSH) is the right call.
 

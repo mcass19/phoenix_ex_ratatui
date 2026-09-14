@@ -15,9 +15,9 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 
 - **Two unified-module APIs** — `use PhoenixExRatatui.LiveView` for a full-page TUI route, `use PhoenixExRatatui.LiveComponent` to embed a TUI inside an existing LiveView. The same module is both the Phoenix component and the `ExRatatui.App` driving it; a hidden `Module.Runtime` proxy bridges the two `handle_info/2` arities.
 - **Callback and reducer runtimes** — `runtime: :reducer` opts into command/subscription-driven apps (`tui_init/1` + `tui_update/2` + `tui_subscriptions/1`); the default `:callbacks` runtime uses `tui_mount/1` + `tui_handle_event/2` + `tui_handle_info/2`.
-- **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas. Arrays not objects, to roughly halve the wire size on full frames.
+- **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas, plus a `regions` list whenever the pixel regions change. Arrays not objects, to roughly halve the wire size on full frames.
 - **Pixel regions for images and 3D** — the hook reports the measured cell size, so the `CellSession` is a pixel surface: `ExRatatui.Widgets.Viewport3D` and `ExRatatui.Widgets.Image` in pixel modes arrive as PNG regions painted as `<img>` overlays at the pane's real resolution (HiDPI aware), instead of half-block cells. Unchanged regions are never re-sent.
-- **Tiny, dependency-free JS hook** — ~5KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
+- **Tiny, dependency-free JS hook** — ~6KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
 - **Inter-page navigation via runtime intents** — return `{:navigate, "/path"}`, `:patch`, or `:redirect` (internal or external) from any handler; the macro dispatches through `push_navigate/2` and friends.
 - **Auto-focus on full-page TUIs** — keystrokes flow without clicking the grid first. Embedded components deliberately don't steal focus.
 - **`:telemetry` integration** — transport connect/disconnect spans, a per-frame render span, and input-forward events, layered above the events `ex_ratatui` already emits.
@@ -32,6 +32,8 @@ The [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/e
 | Home | `/` | Full-page LiveView, reducer runtime, navigation intents |
 | Chat | `/chat` | Full-page LiveView, callbacks runtime, Markdown/Textarea/Throbber/slash-command popup/scrollback |
 | Admin | `/admin` | An embedded reducer-runtime `LiveComponent` with a live Gauge/Table system monitor |
+| Coexistence | `/coexistence` | A full-page TUI LiveView that also defines its own `handle_event/3` and `handle_info/2` next to the `tui_*` callbacks |
+| Cube | `/cube` | Pixel regions: a spinning `Viewport3D` next to a random [picsum.photos](https://picsum.photos) `Image`, both painted as `<img>` overlays; `m` toggles to cells, `n` fetches another photo |
 
 Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
 
@@ -39,7 +41,7 @@ Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
 
 - [ex_ratatui](https://github.com/mcass19/ex_ratatui) — The core terminal UI library this builds on.
 - [kino_ex_ratatui](https://github.com/mcass19/kino_ex_ratatui) — Run TUIs inside [Livebook](https://livebook.dev) notebooks.
-- [raster_ex_ratatui](https://github.com/mcass19/raster_ex_ratatui) — Run TUIs on pixel displays: e-ink panels, SPI LCDs, HDMI through a Linux framebuffer.
+- [raster_ex_ratatui](https://github.com/mcass19/raster_ex_ratatui) — Run TUIs on pixel displays such as e-ink panels, with helpers for Linux framebuffers.
 
 ## Installation
 
@@ -63,6 +65,7 @@ mix deps.get
 
 - Elixir 1.17+
 - Phoenix LiveView 1.1+
+- ExRatatui 0.14+ (pixel regions)
 
 ### Wiring the JS hook
 
