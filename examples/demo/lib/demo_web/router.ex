@@ -13,15 +13,15 @@ defmodule DemoWeb.Router do
   scope "/", DemoWeb do
     pipe_through(:browser)
 
-    # Four views — different integration shapes:
+    # Five views — different integration shapes:
     #
     # /              landing TUI (full-page LV, callbacks runtime)
     # /chat          rich-widget chat (full-page LV, callbacks runtime)
     # /admin         plain LV embedding a reducer-runtime LiveComponent
     # /coexistence   full-page TUI LV that ALSO defines its own
     #                handle_event/3 + handle_info/2 (HTML toolbar)
-    # /cube          pixel regions: a spinning Viewport3D painted as an
-    #                image over the cell grid
+    # /cube          pixel regions: a spinning Viewport3D and a picsum.photos
+    #                Image painted as images over the cell grid
     #
     # Most inter-page navigation flows through `phoenix_ex_ratatui`'s
     # runtime intents (`{:navigate, "/path"}` etc.), dispatched by
