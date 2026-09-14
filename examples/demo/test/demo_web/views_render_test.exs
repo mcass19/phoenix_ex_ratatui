@@ -9,6 +9,8 @@ defmodule DemoWeb.ViewsRenderTest do
   use ExUnit.Case, async: true
 
   alias ExRatatui.CellSession
+  alias ExRatatui.CellSession.Region
+  alias ExRatatui.Command
   alias ExRatatui.Event.Key
   alias ExRatatui.Event.Resize
   alias ExRatatui.Frame
@@ -41,25 +43,48 @@ defmodule DemoWeb.ViewsRenderTest do
   end
 
   test "CubeLive paints the cube as cells on a plain session" do
-    {:ok, state} = DemoWeb.CubeLive.tui_init([])
+    {:ok, state, commands: [%Command{kind: :async}]} = DemoWeb.CubeLive.tui_init([])
     assert painted?(DemoWeb.CubeLive.tui_render(state, frame()))
   end
 
-  test "CubeLive ships the cube as a pixel region on a font-size session" do
-    {:ok, state} = DemoWeb.CubeLive.tui_init([])
+  test "CubeLive ships the cube and the photo as pixel regions on a font-size session" do
+    state = cube_with_photo()
 
     session = CellSession.new(@width, @height, font_size: {8, 16})
     :ok = CellSession.draw(session, DemoWeb.CubeLive.tui_render(state, frame()))
     %{regions: regions} = CellSession.take_cells(session)
 
-    assert [%ExRatatui.CellSession.Region{format: :rgb8}] = regions
+    assert [%Region{format: :rgb8}, %Region{format: :rgb8}] = regions
 
-    # Toggling to cells keeps the same scene inside the grid.
+    # Toggling to cells keeps both inside the grid.
     {:noreply, cells_state} =
       DemoWeb.CubeLive.tui_update({:event, %Key{code: "m", kind: "press"}}, state)
 
     :ok = CellSession.draw(session, DemoWeb.CubeLive.tui_render(cells_state, frame()))
     assert %{regions: []} = CellSession.take_cells(session)
+  end
+
+  test "CubeLive shows the fetch error and fetches again on n" do
+    {:ok, state, _opts} = DemoWeb.CubeLive.tui_init([])
+
+    {:noreply, failed} =
+      DemoWeb.CubeLive.tui_update({:info, {:photo, {:error, :nxdomain}}}, state)
+
+    assert painted?(DemoWeb.CubeLive.tui_render(failed, frame()))
+
+    assert {:noreply, %{photo_status: :loading}, commands: [%Command{kind: :async}]} =
+             DemoWeb.CubeLive.tui_update({:event, %Key{code: "n", kind: "press"}}, failed)
+
+    # A fetch already in flight is not started twice.
+    assert {:noreply, ^state} =
+             DemoWeb.CubeLive.tui_update({:event, %Key{code: "n", kind: "press"}}, state)
+  end
+
+  test "CubeLive reports a photo it cannot decode" do
+    {:ok, state, _opts} = DemoWeb.CubeLive.tui_init([])
+
+    assert {:noreply, %{photo: nil, photo_status: {:error, {:decode_failed, _}}}} =
+             DemoWeb.CubeLive.tui_update({:info, {:photo, {:ok, "not an image"}}}, state)
   end
 
   test "ChatLive handles string-modifier keys without crashing" do
@@ -87,6 +112,27 @@ defmodule DemoWeb.ViewsRenderTest do
   end
 
   defp frame, do: %Frame{width: @width, height: @height}
+
+  # A loaded /cube state, with a small generated PNG standing in for the
+  # picsum.photos download.
+  defp cube_with_photo do
+    {:ok, state, _opts} = DemoWeb.CubeLive.tui_init([])
+
+    png =
+      Region.to_png(%Region{
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        pixel_width: 4,
+        pixel_height: 4,
+        format: :rgb8,
+        data: :binary.copy(<<200, 80, 40>>, 16)
+      })
+
+    {:noreply, loaded} = DemoWeb.CubeLive.tui_update({:info, {:photo, {:ok, png}}}, state)
+    loaded
+  end
 
   defp painted?(widgets) do
     session = CellSession.new(@width, @height)
