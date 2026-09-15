@@ -50,7 +50,7 @@ Add `phoenix_ex_ratatui` to the deps in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:phoenix_ex_ratatui, "~> 0.2"}
+    {:phoenix_ex_ratatui, "~> 0.3"}
   ]
 end
 ```
