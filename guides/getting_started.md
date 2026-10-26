@@ -214,6 +214,19 @@ On a `LiveComponent`, the framework gives it no `handle_info` and no lifecycle h
 >
 > To drive the *TUI itself* from PubSub (a chat room, live metrics), subscribe in `tui_mount/1` and handle the broadcast in `tui_handle_info/2` — both run in the TUI runtime process, so the message reaches your App state and triggers a re-render. Use the LiveView's own `handle_info/2` only for page-level concerns outside the TUI.
 
+## Key releases
+
+By default a key event is always `kind: "press"`, and holding a key repeats the press — the browser acts like a classic terminal. Returning `keyboard_enhancement: true` from `tui_mount_opts/1` switches on what terminals with the kitty keyboard protocol report: one `"press"` when the key goes down, `"repeat"`s while it is held, `"release"` when it comes up. The hook also releases every held key when the grid loses focus or the tab is hidden, so a key held while switching tabs doesn't stay down forever.
+
+```elixir
+def tui_mount_opts(_socket), do: [keyboard_enhancement: true]
+
+def tui_handle_event(%Key{code: " ", kind: "release"}, state),
+  do: {:noreply, %{state | charging?: false}}
+```
+
+Handlers that should keep firing while a key is held match `"repeat"` as well as `"press"`. The demo app's `/keys` page is a complete example.
+
 ## Inter-page navigation
 
 A TUI can request navigation to another LV route by returning a list of runtime intents from any handler. The intents flow through ExRatatui.Server's intent writer into the LV, which dispatches them to `Phoenix.LiveView.push_navigate/2` (and its siblings):

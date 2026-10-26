@@ -6,7 +6,9 @@
 //   2. handleEvent("phx_ex_ratatui:render", payload) — paint diff ops
 //                    onto the cell grid
 //   3. ResizeObserver fires on viewport changes — re-measure and push
-//   4. keydown listener forwards keys as input events
+//   4. keydown / keyup listeners forward keys as input events, with
+//      "press", "repeat" (autorepeat) and "release"; blur and a hidden
+//      tab release every held key
 //   5. destroyed() — clean up listeners
 
 // ----------------------------------------------------------------------
@@ -229,6 +231,59 @@ function modifiersFor(event) {
 }
 
 // ----------------------------------------------------------------------
+// Held keys
+// ----------------------------------------------------------------------
+//
+// Every keydown is a "press", or a "repeat" while the OS autorepeats it,
+// and every keyup a "release". The server turns repeats back into presses
+// and drops releases unless the app asked for them
+// (`keyboard_enhancement: true`), so apps written for press-only
+// terminals see what they always did.
+//
+// Keys are remembered by physical key (`event.code`) so a release
+// reports the code its press did, even when Shift comes up first
+// ("L" down, "l" up). A key we never saw go down (pressed before the
+// grid had focus) has no release to send.
+
+function keyPayload(code, modifiers, pressKind) {
+  return { kind: "key", code, modifiers, press_kind: pressKind };
+}
+
+class KeyTracker {
+  constructor() {
+    this.held = new Map();
+  }
+
+  press(event) {
+    const code = keyToCode(event);
+    const modifiers = modifiersFor(event);
+    this.held.set(physicalKey(event), code);
+    return keyPayload(code, modifiers, event.repeat ? "repeat" : "press");
+  }
+
+  // `null` for a key that isn't held.
+  release(event) {
+    const key = physicalKey(event);
+    const code = this.held.get(key);
+    if (code === undefined) return null;
+    this.held.delete(key);
+    return keyPayload(code, modifiersFor(event), "release");
+  }
+
+  // Every held key, released: the grid lost focus or the tab was hidden,
+  // so their keyups will never reach us.
+  releaseAll() {
+    const payloads = [...this.held.values()].map((code) => keyPayload(code, [], "release"));
+    this.held.clear();
+    return payloads;
+  }
+}
+
+function physicalKey(event) {
+  return event.code || keyToCode(event);
+}
+
+// ----------------------------------------------------------------------
 // The Hook
 // ----------------------------------------------------------------------
 
@@ -272,13 +327,27 @@ export const PhoenixExRatatuiHook = {
     this.resizeObserver = new ResizeObserver(() => this.reportSize());
     this.resizeObserver.observe(this.el);
 
+    this.keys = new KeyTracker();
     this.keydownListener = (event) => this.onKeydown(event);
+    this.keyupListener = (event) => this.onKeyup(event);
+    this.blurListener = () => this.releaseAll();
+    this.visibilityListener = () => {
+      if (document.hidden) this.releaseAll();
+    };
     this.el.addEventListener("keydown", this.keydownListener);
+    this.el.addEventListener("keyup", this.keyupListener);
+    this.el.addEventListener("blur", this.blurListener);
+    document.addEventListener("visibilitychange", this.visibilityListener);
   },
 
   destroyed() {
     if (this.resizeObserver) this.resizeObserver.disconnect();
-    if (this.keydownListener) this.el.removeEventListener("keydown", this.keydownListener);
+    if (this.keydownListener) {
+      this.el.removeEventListener("keydown", this.keydownListener);
+      this.el.removeEventListener("keyup", this.keyupListener);
+      this.el.removeEventListener("blur", this.blurListener);
+      document.removeEventListener("visibilitychange", this.visibilityListener);
+    }
   },
 
   measureChar() {
@@ -430,12 +499,21 @@ export const PhoenixExRatatuiHook = {
 
   onKeydown(event) {
     event.preventDefault();
-    this.pushEventTo(this.el, "phx_ex_ratatui:input", {
-      kind: "key",
-      code: keyToCode(event),
-      modifiers: modifiersFor(event),
-      press_kind: "press",
-    });
+    this.pushInput(this.keys.press(event));
+  },
+
+  onKeyup(event) {
+    event.preventDefault();
+    const payload = this.keys.release(event);
+    if (payload) this.pushInput(payload);
+  },
+
+  releaseAll() {
+    for (const payload of this.keys.releaseAll()) this.pushInput(payload);
+  },
+
+  pushInput(payload) {
+    this.pushEventTo(this.el, "phx_ex_ratatui:input", payload);
   },
 };
 
@@ -448,6 +526,7 @@ export const __test__ = {
   buildStyle,
   keyToCode,
   modifiersFor,
+  KeyTracker,
   cellPixelSize,
   regionStyle,
   latestOnly,

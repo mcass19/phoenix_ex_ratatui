@@ -17,8 +17,9 @@ Run [ExRatatui](https://github.com/mcass19/ex_ratatui) apps inside a [Phoenix Li
 - **Callback and reducer runtimes** — `runtime: :reducer` opts into command/subscription-driven apps (`tui_init/1` + `tui_update/2` + `tui_subscriptions/1`); the default `:callbacks` runtime uses `tui_mount/1` + `tui_handle_event/2` + `tui_handle_info/2`.
 - **Cell-diff rendering over the socket** — the rendered cell buffer ships as a structured `%{width, height, ops}` payload of `<span>`-cell deltas, plus a `regions` list whenever the pixel regions change. Arrays not objects, to roughly halve the wire size on full frames.
 - **Pixel regions for images and 3D** — the hook reports the measured cell size, so the `CellSession` is a pixel surface: `ExRatatui.Widgets.Viewport3D` and `ExRatatui.Widgets.Image` in pixel modes arrive as PNG regions painted as `<img>` overlays at the pane's real resolution (HiDPI aware), instead of half-block cells. Unchanged regions are never re-sent.
-- **Tiny, dependency-free JS hook** — ~6KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` as input events, and re-reports size via `ResizeObserver`.
+- **Tiny, dependency-free JS hook** — ~6KB minified (vs. xterm.js's ~250KB). Measures the cell box, paints diffs by direct `cells[row][col]` lookup, forwards `keydown` / `keyup` as input events, and re-reports size via `ResizeObserver`.
 - **Inter-page navigation via runtime intents** — return `{:navigate, "/path"}`, `:patch`, or `:redirect` (internal or external) from any handler; the macro dispatches through `push_navigate/2` and friends.
+- **Key releases** — `keyboard_enhancement: true` from `tui_mount_opts/1` gives an app `"press"`, `"repeat"` and `"release"` key events, the browser acting as a terminal with the kitty keyboard protocol; held keys are released when the tab loses focus. Off by default, so existing apps keep seeing presses only.
 - **Auto-focus on full-page TUIs** — keystrokes flow without clicking the grid first. Embedded components deliberately don't steal focus.
 - **`:telemetry` integration** — transport connect/disconnect spans, a per-frame render span, and input-forward events, layered above the events `ex_ratatui` already emits.
 - **Full color and modifiers** — named, RGB, and 256-color indexed; bold, italic, underline, and more, inherited straight from ExRatatui.
@@ -34,6 +35,7 @@ The [`examples/demo/`](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/e
 | Admin | `/admin` | An embedded reducer-runtime `LiveComponent` with a live Gauge/Table system monitor |
 | Coexistence | `/coexistence` | A full-page TUI LiveView that also defines its own `handle_event/3` and `handle_info/2` next to the `tui_*` callbacks |
 | Cube | `/cube` | Pixel regions: a spinning `Viewport3D` next to a random [picsum.photos](https://picsum.photos) `Image`, both painted as `<img>` overlays; `m` toggles to cells, `n` fetches another photo |
+| Keys | `/keys` | Key releases: `keyboard_enhancement: true` from `tui_mount_opts/1`, a drive pad lit while arrows are held, and a log of every press / repeat / release |
 
 Run it with `mix deps.get && mix phx.server` from inside `examples/demo/`.
 
@@ -170,12 +172,28 @@ end
                                                    ▼
                                        JS hook paints <span> cells
                                        and <img> pixel regions
-   browser keydown ──── "phx_ex_ratatui:input" ────▶ back into the runtime
+   browser keydown/keyup ── "phx_ex_ratatui:input" ──▶ back into the runtime
 ```
 
 A `CellSession` plus a linked ExRatatui.Server drive the module. On each render the server hands a `%CellSession.Diff{}` to the transport, which forwards it to the LiveView; `PhoenixExRatatui.Renderer.Html` encodes it to a JSON-friendly payload and `push_event/3`s it to the browser. The hook paints the deltas and forwards keystrokes back as `phx_ex_ratatui:input` events. Because the `Server` is linked to the LiveView process, teardown is deterministic — when the LiveView exits, the session closes and disconnect telemetry fires.
 
 The hook also measures the cell box and reports it (in device pixels) with its first resize, so the transport opens the `CellSession` with that `font_size:`. From then on `Viewport3D` and `Image` widgets in pixel modes render to real bitmaps: the payload carries a `regions` list of `[x, y, width, height, png_data_url]` entries — the complete set on screen — and the hook paints each as an `<img>` in a layer over the grid, sized with the same CSS variables as the cells. When a frame's region set is unchanged the key is omitted and nothing is re-encoded or re-sent, so a static picture costs nothing per frame. Widgets in cell modes (`:braille`, `:half_block`, `:halfblocks`) keep painting cells. See `ExRatatui.CellSession.Region` and the ex_ratatui guide on rendering to non-terminal surfaces for the contract.
+
+## Key releases
+
+Games, driving and anything else that acts "while held" need to know when a key comes up. The hook reports `"press"` on keydown, `"repeat"` while the browser autorepeats, and `"release"` on keyup, and releases every held key when the grid loses focus or the tab is hidden. An app opts in the same way it would on a terminal:
+
+```elixir
+def tui_mount_opts(_socket), do: [keyboard_enhancement: true]
+
+def tui_handle_event(%Key{code: "up", kind: kind}, state) when kind in ["press", "repeat"],
+  do: {:noreply, %{state | throttle: 1.0}}
+
+def tui_handle_event(%Key{code: "up", kind: "release"}, state),
+  do: {:noreply, %{state | throttle: 0.0}}
+```
+
+Without the option the browser acts like a press-only terminal: autorepeat arrives as `"press"` and releases are dropped, so existing apps are unaffected. The `/keys` page in the [demo app](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo) shows it live.
 
 ## Inter-page navigation via runtime intents
 
