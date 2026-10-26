@@ -79,6 +79,13 @@ defmodule PhoenixExRatatui.LiveComponent do
   Override `tui_component_update/2` only when you need to transform or
   derive from those assigns before they're stored.
 
+  ## Key releases
+
+  Same as `PhoenixExRatatui.LiveView`: return `keyboard_enhancement:
+  true` from `tui_mount_opts/1` to get `"repeat"` and `"release"` key
+  events; without it autorepeat arrives as presses and releases not at
+  all. See the "Key releases" section there.
+
   ## Wire model
 
   LiveComponents share the parent LV's process — they don't have
@@ -342,7 +349,9 @@ defmodule PhoenixExRatatui.LiveComponent do
 
     case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
-        Phoenix.Component.assign(socket, :tui, refs)
+        socket
+        |> Phoenix.Component.assign(:tui, refs)
+        |> Phoenix.Component.assign(:tui_key_releases, PXRLV.__key_releases__(mount_opts))
 
       {:error, reason} ->
         Phoenix.Component.assign(socket, :tui_error, inspect(reason))
@@ -363,12 +372,7 @@ defmodule PhoenixExRatatui.LiveComponent do
         socket
 
       refs ->
-        event = PXRLV.decode_input(payload)
-
-        Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
-
-        :ok = Transport.push_event(refs, event)
-        socket
+        PXRLV.__forward_input__(socket, refs, payload)
     end
   end
 end

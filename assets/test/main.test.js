@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 
 import { __test__ } from "../js/main.js";
 
-const { colorToCss, indexedColor, buildStyle, keyToCode, modifiersFor, NAMED_COLORS } =
+const { colorToCss, indexedColor, buildStyle, keyToCode, modifiersFor, KeyTracker, NAMED_COLORS } =
   __test__;
 
 test("colorToCss resolves the color shapes ExRatatui sends", () => {
@@ -95,6 +95,64 @@ test("modifiersFor collects the active modifier keys in canonical order", () => 
     "alt",
     "meta",
   ]);
+});
+
+test("KeyTracker reports press, repeat and release for a held key", () => {
+  const keys = new KeyTracker();
+  const down = { key: "ArrowUp", code: "ArrowUp" };
+
+  assert.deepEqual(keys.press(down), {
+    kind: "key",
+    code: "up",
+    modifiers: [],
+    press_kind: "press",
+  });
+  assert.equal(keys.press({ ...down, repeat: true }).press_kind, "repeat");
+  assert.deepEqual(keys.release(down), {
+    kind: "key",
+    code: "up",
+    modifiers: [],
+    press_kind: "release",
+  });
+
+  // Released once: a second keyup has nothing to release.
+  assert.equal(keys.release(down), null);
+});
+
+test("KeyTracker releases the code a key was pressed with", () => {
+  const keys = new KeyTracker();
+
+  // Shift+L down, Shift up first, then the L key: "l" comes up.
+  keys.press({ key: "L", code: "KeyL", shiftKey: true });
+  const release = keys.release({ key: "l", code: "KeyL" });
+
+  assert.equal(release.code, "L");
+  assert.deepEqual(release.modifiers, []);
+});
+
+test("KeyTracker ignores a keyup it never saw go down", () => {
+  assert.equal(new KeyTracker().release({ key: "a", code: "KeyA" }), null);
+});
+
+test("KeyTracker falls back to the key when the event has no physical code", () => {
+  const keys = new KeyTracker();
+  keys.press({ key: "a" });
+  assert.equal(keys.release({ key: "a" }).code, "a");
+});
+
+test("KeyTracker.releaseAll releases every held key once", () => {
+  const keys = new KeyTracker();
+  keys.press({ key: "ArrowUp", code: "ArrowUp" });
+  keys.press({ key: "ArrowLeft", code: "ArrowLeft", ctrlKey: true });
+
+  assert.deepEqual(
+    keys.releaseAll().map(({ code, modifiers, press_kind }) => [code, modifiers, press_kind]),
+    [
+      ["up", [], "release"],
+      ["left", [], "release"],
+    ],
+  );
+  assert.deepEqual(keys.releaseAll(), []);
 });
 
 test("cellPixelSize reports the measured cell in device pixels, never zero", () => {

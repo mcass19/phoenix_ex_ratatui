@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Key releases.** The JS hook now reports `keyup` as `"release"` and autorepeated keydowns as `"repeat"` (sent as `"press_kind"`), and releases every held key when the grid loses focus or the tab is hidden. A release carries the code its press did, so Shift coming up first doesn't turn `"L"` into `"l"`. An app gets them by returning `keyboard_enhancement: true` from `tui_mount_opts/1`, the same option ex_ratatui uses on terminals; without it, repeats arrive as presses and releases are dropped, so existing apps see no change. `PhoenixExRatatui.LiveView.decode_input/1` validates the kind, reading anything unknown — or nothing, from an older bundle — as `"press"`. Rebuild the assets to pick up the hook.
+
+### Examples
+
+- `/keys` in the demo app: a drive pad lit exactly while arrows are held, with a live log of every press, repeat and release.
+
 ## [0.3.0] - 2026-09-15
 
 ### Added

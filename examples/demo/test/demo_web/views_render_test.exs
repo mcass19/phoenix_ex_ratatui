@@ -42,6 +42,19 @@ defmodule DemoWeb.ViewsRenderTest do
     assert painted?(DemoWeb.CoexistenceLive.tui_render(state, frame()))
   end
 
+  test "KeysLive lights the pad while an arrow is held and logs every kind" do
+    {:ok, state} = DemoWeb.KeysLive.tui_mount([])
+    assert DemoWeb.KeysLive.tui_mount_opts(nil) == [keyboard_enhancement: true]
+
+    {:noreply, state} = DemoWeb.KeysLive.tui_handle_event(%Key{code: "up", kind: "press"}, state)
+    assert MapSet.member?(state.held, "up")
+    assert painted?(DemoWeb.KeysLive.tui_render(state, frame()))
+
+    {:noreply, state} = DemoWeb.KeysLive.tui_handle_event(%Key{code: "up", kind: "release"}, state)
+    refute MapSet.member?(state.held, "up")
+    assert [~s(release  "up" []), ~s(press    "up" [])] = state.log
+  end
+
   test "CubeLive paints the cube as cells on a plain session" do
     {:ok, state, commands: [%Command{kind: :async}]} = DemoWeb.CubeLive.tui_init([])
     assert painted?(DemoWeb.CubeLive.tui_render(state, frame()))

@@ -101,7 +101,8 @@ defmodule PhoenixExRatatui.LiveView do
   - **Subsequent resizes** — `Transport.resize/3` updates the
     `CellSession` and notifies the runtime.
   - **Hook input** — the `:handle_event` hook decodes it into an
-    `%ExRatatui.Event.Key{}` and forwards it via `Transport.push_event/2`.
+    `%ExRatatui.Event.Key{}` and forwards it via `Transport.push_event/2`
+    (repeats and releases only for apps that asked; see "Key releases").
   - **Runtime emits a frame** — the `:handle_info` hook encodes it via
     `PhoenixExRatatui.Renderer.Html.encode_diff/2` and pushes a
     `phx_ex_ratatui:render` event, carrying `"regions"` only when the
@@ -111,6 +112,23 @@ defmodule PhoenixExRatatui.LiveView do
     sets `:tui_ended` so the user sees a refresh prompt instead of a
     frozen-cells display. EXITs from any other process pass through to
     the user's own `handle_info/2`.
+
+  ## Key releases
+
+  The hook reports every key the way a terminal with the kitty keyboard
+  protocol does: `"press"` on keydown, `"repeat"` while the browser
+  autorepeats it, `"release"` on keyup — and a release for every held
+  key when the grid loses focus or the tab is hidden, since their keyups
+  will never arrive. Apps opt in by returning `keyboard_enhancement:
+  true` from `tui_mount_opts/1`, as they would on a terminal:
+
+      def tui_mount_opts(_socket), do: [keyboard_enhancement: true]
+
+  Without it the browser behaves like a press-only terminal: autorepeat
+  arrives as `"press"` and releases not at all, so existing apps see
+  what they always did. See ex_ratatui's
+  [Key releases](https://hexdocs.pm/ex_ratatui/building_uis.html#key-releases)
+  for handling them.
 
   ## Options
 
@@ -171,20 +189,56 @@ defmodule PhoenixExRatatui.LiveView do
   than atoms) also means untrusted client input never grows the atom
   table.
 
+  The hook reports `"press"`, `"repeat"` (autorepeat) and `"release"`
+  as `"press_kind"`. Anything else — or nothing, from a bundle built
+  before releases — reads as `"press"`. Whether an app sees repeats and
+  releases at all is up to `keyboard_enhancement: true` in
+  `tui_mount_opts/1`; see the "Key releases" section of the moduledoc.
+
   ## Examples
 
       iex> event = PhoenixExRatatui.LiveView.decode_input(%{"kind" => "key", "code" => "a", "modifiers" => ["ctrl"]})
       iex> {event.code, event.modifiers, event.kind}
       {"a", ["ctrl"], "press"}
+
+      iex> PhoenixExRatatui.LiveView.decode_input(%{"kind" => "key", "code" => "up", "press_kind" => "release"}).kind
+      "release"
+
+      iex> PhoenixExRatatui.LiveView.decode_input(%{"kind" => "key", "code" => "up", "press_kind" => "smash"}).kind
+      "press"
   """
   @spec decode_input(map()) :: ExRatatui.Event.t()
   def decode_input(%{"kind" => "key"} = params) do
     %Key{
       code: Map.fetch!(params, "code"),
       modifiers: decode_modifiers(Map.get(params, "modifiers", [])),
-      kind: Map.get(params, "press_kind", "press")
+      kind: decode_kind(Map.get(params, "press_kind"))
     }
   end
+
+  defp decode_kind(kind) when kind in ["press", "repeat", "release"], do: kind
+  defp decode_kind(_kind), do: "press"
+
+  @doc false
+  # The event an app gets for an input payload, or `nil` for none. An app
+  # that didn't ask for key releases sees the browser as a press-only
+  # terminal: autorepeat arrives as presses and releases not at all.
+  def __input_event__(payload, key_releases?) do
+    payload |> decode_input() |> apply_key_releases(key_releases?)
+  end
+
+  defp apply_key_releases(event, true), do: event
+  defp apply_key_releases(%Key{kind: "release"}, _key_releases?), do: nil
+
+  defp apply_key_releases(%Key{kind: "repeat"} = event, _key_releases?),
+    do: %{event | kind: "press"}
+
+  defp apply_key_releases(event, _key_releases?), do: event
+
+  @doc false
+  # Remembered when the session starts, from the app's own mount opts.
+  def __key_releases__(mount_opts),
+    do: Keyword.get(mount_opts, :keyboard_enhancement, false) == true
 
   # Only keep the string modifiers the JS hook sends, matching the
   # `[String.t()]` shape `ExRatatui.Event.Key` uses everywhere else.
@@ -528,7 +582,9 @@ defmodule PhoenixExRatatui.LiveView do
 
     case Transport.start_link(start_link_opts) do
       {:ok, refs} ->
-        Phoenix.Component.assign(socket, :tui, refs)
+        socket
+        |> Phoenix.Component.assign(:tui, refs)
+        |> Phoenix.Component.assign(:tui_key_releases, __key_releases__(mount_opts))
 
       {:error, reason} ->
         Phoenix.Component.assign(socket, :tui_error, inspect(reason))
@@ -624,10 +680,22 @@ defmodule PhoenixExRatatui.LiveView do
         socket
 
       refs ->
-        event = decode_input(payload)
-        Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
-        :ok = Transport.push_event(refs, event)
-        socket
+        __forward_input__(socket, refs, payload)
     end
+  end
+
+  @doc false
+  # Shared with `PhoenixExRatatui.LiveComponent`.
+  def __forward_input__(socket, refs, payload) do
+    key_releases? = Map.get(socket.assigns, :tui_key_releases, false)
+    forward_input(socket, refs, __input_event__(payload, key_releases?))
+  end
+
+  defp forward_input(socket, _refs, nil), do: socket
+
+  defp forward_input(socket, refs, event) do
+    Telemetry.execute([:input, :forward], %{}, %{mod: refs.mod, event: event})
+    :ok = Transport.push_event(refs, event)
+    socket
   end
 end

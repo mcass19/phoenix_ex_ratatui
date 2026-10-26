@@ -7,7 +7,7 @@ defmodule DemoWeb.HomeLive do
   Uses the reducer runtime — a `Subscription.interval` drives the rain
   animation through ticks delivered over the LiveView socket (the same
   shape as the admin panel), and a `%Event.Resize{}` reseeds the field
-  to the live terminal size. `<c>`/`<a>`/`<x>`/`<q>` emit runtime intents
+  to the live terminal size. `<c>`/`<a>`/`<x>`/`<d>`/`<k>`/`<q>` emit runtime intents
   the LV macro dispatches into navigation.
   """
   use PhoenixExRatatui.LiveView, runtime: :reducer
@@ -54,6 +54,9 @@ defmodule DemoWeb.HomeLive do
   def tui_update({:event, %Key{code: "d"}}, state),
     do: {:noreply, state, intents: [{:navigate, "/cube"}]}
 
+  def tui_update({:event, %Key{code: "k"}}, state),
+    do: {:noreply, state, intents: [{:navigate, "/keys"}]}
+
   def tui_update({:event, %Key{code: "q"}}, state),
     do: {:noreply, state, intents: [{:redirect, [external: @repo_url]}]}
 
@@ -76,7 +79,14 @@ defmodule DemoWeb.HomeLive do
     title_band = UI.center_box(inner_rect(box), box.width - 2, @title_rows)
 
     footer =
-      UI.nav_hints([{"c", "chat"}, {"a", "admin"}, {"x", "coexist"}, {"d", "3d"}, {"q", "exit"}])
+      UI.nav_hints([
+        {"c", "chat"},
+        {"a", "admin"},
+        {"x", "coexist"},
+        {"d", "3d"},
+        {"k", "keys"},
+        {"q", "exit"}
+      ])
 
     [
       {rain_canvas, content_area},
