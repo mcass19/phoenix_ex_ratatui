@@ -22,9 +22,10 @@ defmodule DemoWeb do
     end
   end
 
+  # `use Phoenix.LiveView` already brings in `Phoenix.Component`; using it
+  # again generates its compile-time verify function twice.
   defp html_helpers do
     quote do
-      use Phoenix.Component
       import Phoenix.HTML
     end
   end
