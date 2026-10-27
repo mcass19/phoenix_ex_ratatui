@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
 ### Added
 
 - **Key releases.** The JS hook now reports `keyup` as `"release"` and autorepeated keydowns as `"repeat"` (sent as `"press_kind"`), and releases every held key when the grid loses focus or the tab is hidden. A release carries the code its press did, so Shift coming up first doesn't turn `"L"` into `"l"`. An app gets them by returning `keyboard_enhancement: true` from `tui_mount_opts/1`, the same option ex_ratatui uses on terminals; without it, repeats arrive as presses and releases are dropped, so existing apps see no change. `PhoenixExRatatui.LiveView.decode_input/1` validates the kind, reading anything unknown — or nothing, from an older bundle — as `"press"`. Rebuild the assets to pick up the hook.
@@ -90,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **[Getting Started guide](guides/getting_started.md)** walking through both unified-module APIs, the JS hook wiring, and the typical project structure. **[Examples directory](https://github.com/mcass19/phoenix_ex_ratatui/tree/main/examples/demo)** ships a minimal Phoenix app under `examples/demo/` that demonstrates the unified LV and LC side-by-side — useful as a copy-paste starting point for new integrations.
 
-[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.3.0...0.4.0
 [0.3.0]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.2.0...0.3.0
 [0.2.0]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.1...0.2.0
 [0.1.1]: https://github.com/mcass19/phoenix_ex_ratatui/compare/v0.1.0...0.1.1
